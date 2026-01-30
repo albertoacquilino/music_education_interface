@@ -9,12 +9,22 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { IonicModule, PickerController } from '@ionic/angular';
+import { FormsModule } from '@angular/forms';
 import { range } from 'lodash';
 import { MAXTEMPO, MINTEMPO } from 'src/app/constants';
 
+// Preset tempos with simple, clear labels
+const TEMPO_PRESETS = [
+  { name: 'Very Slow', bpm: 45 },
+  { name: 'Slow', bpm: 76 },
+  { name: 'Medium', bpm: 108 },
+  { name: 'Fast', bpm: 132 },
+  { name: 'Very Fast', bpm: 168 }
+];
+
 /**
- * TempoSelectorComponent is responsible for displaying a tempo selector interface.
- * It allows users to select a tempo value and emits changes when a tempo is selected.
+ * TempoSelectorComponent is responsible for displaying an enhanced tempo selector interface.
+ * It features a smooth slider, preset tempo buttons, and real-time BPM display.
  * 
  * @example
  * <tempo-selector [tempo]="120" (change)="onTempoChange($event)"></tempo-selector>
@@ -22,51 +32,173 @@ import { MAXTEMPO, MINTEMPO } from 'src/app/constants';
 @Component({
   selector: 'tempo-selector',
   template: `
-  <div class="simulate-input">
-  <div class="title-section-wrapper">Tempo:</div>
-  <div class="tempo" (click)="openPicker()">
-    <h1>
-        &#9833;=
-        <span id="tempo">{{ tempo }} bpm</span>
-    </h1>
-  </div>
-  
+  <div class="tempo-container">
+    <div class="tempo-header">
+      <div class="title-section">Tempo</div>
+      <div class="tempo-display">
+        <span class="note-symbol">&#9833;</span>=
+        <span class="tempo-value">{{ tempo }}</span>
+        <span class="tempo-unit">bpm</span>
+      </div>
+    </div>
+
+    <div class="slider-container">
+      <ion-range
+        [min]="minTempo"
+        [max]="maxTempo"
+        [value]="tempo"
+        [pin]="true"
+        [pinFormatter]="pinFormatter"
+        [color]="'primary'"
+        (ionChange)="onSliderChange($event)"
+        (ionKnobMoveEnd)="onSliderRelease()"
+      >
+        <ion-label slot="start">{{ minTempo }}</ion-label>
+        <ion-label slot="end">{{ maxTempo }}</ion-label>
+      </ion-range>
+    </div>
+
+    <div class="tempo-presets">
+      <ion-button
+        *ngFor="let preset of presets"
+        size="small"
+        fill="outline"
+        [color]="tempo === preset.bpm ? 'primary' : 'medium'"
+        (click)="setPreset(preset.bpm)"
+        class="preset-button"
+      >
+        <div class="preset-content">
+          <div class="preset-name">{{ preset.name }}</div>
+          <div class="preset-bpm">{{ preset.bpm }}</div>
+        </div>
+      </ion-button>
+    </div>
   </div>
   `,
   styles: [`
-  .tempo h1 {
-    font-size: 1em;
-    text-align: center;
-    margin:10px 10px 10px 10px;
-  }
-.title-section-wrapper{
-font-size: 1em;
-}
-  .tempo {
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%; /* Fill container */
-  }
-  .simulate-input {
-    background-color: #white;
+  .tempo-container {
+    background-color: #fff;
     border: 2px solid #009dda;
     border-radius: 6px;
-    padding: 8px 10px;
-    flex-grow: 1;
+    padding: 12px;
+    color: black;
+    min-width: 280px;
+  }
+
+  .tempo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .title-section {
+    font-size: 1em;
+    font-weight: normal;
+    color: black;
+  }
+
+  .tempo-display {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-weight: normal;
+  }
+
+  .note-symbol {
+    font-size: 1.2em;
+    color: black;
+  }
+
+  .tempo-value {
+    font-size: 1.5em;
+    color: black;
+    min-width: 45px;
+    text-align: center;
+  }
+
+  .tempo-unit {
+    font-size: 0.9em;
+    color: black;
+  }
+
+  .slider-container {
+    margin: 16px 0;
+  }
+
+  ion-range {
+    --bar-background: #e0e0e0;
+    --bar-background-active: #009dda;
+    --bar-height: 4px;
+    --bar-border-radius: 2px;
+    --knob-background: #009dda;
+    --knob-size: 24px;
+    --pin-background: #009dda;
+    --pin-color: white;
+  }
+
+  ion-range::part(tick) {
+    background: #d0d0d0;
+  }
+
+  ion-range::part(tick-active) {
+    background: #009dda;
+  }
+
+  ion-label {
+    font-size: 0.85em;
+    color: #666;
+  }
+
+  .tempo-presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    justify-content: space-between;
+  }
+
+  .preset-button {
+    --padding-start: 8px;
+    --padding-end: 8px;
+    --padding-top: 6px;
+    --padding-bottom: 6px;
+    height: auto;
+    min-width: 52px;
+    font-size: 0.75em;
+    flex: 1;
+  }
+
+  .preset-content {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    color: black;
-    max-width: 200px;
-    max-height: 200px;
-    box-sizing: border-box;
+    align-items: center;
+    line-height: 1.2;
+  }
+
+  .preset-name {
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+
+  .preset-bpm {
+    font-size: 0.85em;
+    opacity: 0.8;
+  }
+
+  /* Animation for tempo value change */
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  .tempo-value.changed {
+    animation: pulse 0.3s ease-in-out;
   }
   `],
   standalone: true,
   imports: [
-    IonicModule, CommonModule
+    IonicModule, CommonModule, FormsModule
   ]
 })
 export class TempoSelectorComponent implements OnInit {
@@ -85,6 +217,26 @@ export class TempoSelectorComponent implements OnInit {
   @Output() change: EventEmitter<number> = new EventEmitter<number>();
 
   /**
+   * Minimum tempo value
+   */
+  readonly minTempo = MINTEMPO;
+
+  /**
+   * Maximum tempo value
+   */
+  readonly maxTempo = MAXTEMPO;
+
+  /**
+   * Tempo presets for quick selection
+   */
+  readonly presets = TEMPO_PRESETS;
+
+  /**
+   * Tracks if slider is being actively dragged
+   */
+  private isDragging = false;
+
+  /**
    * Constructor for the TempoSelectorComponent.
    * 
    * @param _picker - The PickerController used to create and manage the tempo picker.
@@ -100,12 +252,34 @@ export class TempoSelectorComponent implements OnInit {
    */
   ngOnInit() { }
 
+  pinFormatter = (value: number) => {
+    return `${Math.round(value)} bpm`;
+  }
+
+  onSliderChange(event: any) {
+    this.isDragging = true;
+    const newTempo = Math.round(event.detail.value);
+    if (newTempo !== this.tempo) {
+      this.tempo = newTempo;
+    }
+  }
+
   /**
-   * Opens the picker to select a new tempo value.
-   * 
-   * This method creates a list of tempo options based on the defined minimum and maximum tempo values.
-   * It presents a picker to the user, allowing them to select a tempo value.
+   * Handles slider release - emits final tempo value
    */
+  onSliderRelease() {
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.change.emit(this.tempo);
+    }
+  }
+
+  setPreset(bpm: number) {
+    this.tempo = bpm;
+    this.change.emit(this.tempo);
+  }
+
+  // Keeping the old picker method for reference
   async openPicker() {
     // Create list of options to be selected
     let options: { value: number, text: string }[];
@@ -114,9 +288,9 @@ export class TempoSelectorComponent implements OnInit {
     let rangeValues: number[] = [];
     let unit: string;
 
-    selectedValue = this.tempo; // Get the current tempo value
-    rangeValues = range(MINTEMPO, MAXTEMPO + 1, 5); // Generate tempo values from MINTEMPO to MAXTEMPO in steps of 5
-    unit = 'bpm'; // Define the unit for the tempo
+    selectedValue = this.tempo;
+    rangeValues = range(MINTEMPO, MAXTEMPO + 1, 5);
+    unit = 'bpm';
 
     // Map the range values to options for the picker
     options = rangeValues.map(value => ({
