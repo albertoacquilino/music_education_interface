@@ -279,7 +279,6 @@ export class TempoSelectorComponent implements OnInit {
     this.change.emit(this.tempo);
   }
 
-  // Keeping the old picker method for reference
   async openPicker() {
     // Create list of options to be selected
     let options: { value: number, text: string }[];
