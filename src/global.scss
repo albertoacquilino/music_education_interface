@@ -24,3 +24,80 @@
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
+// DARK MODE STYLES
+body.dark-theme {
+  //turns main background to black and texts to white
+  &, .ion-app, .ion-page, #container, .wrapper, ion-modal {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  .top, .middle, .controls {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  //OVERRIDE: SVG Text and Ticks indide Tuner
+  chromatic-tuner svg path[fill="#4E4E4E"] {
+    fill: #ffffff !important;
+  }
+  chromatic-tuner svg path[stroke="#4E4E4E"] {
+    stroke: #ffffff !important;
+  }
+
+  //OVERRIDE: Metronome (1,2,3,4), Semaphore (REST/LISTEN/PLAY), Score Note Name
+  .metronome-bullet, 
+  .metronome-bullet h1,
+  #metronome-label,
+  semaphore-light, 
+  semaphore-light *,
+  .score,
+  score-view,
+  score-view * {
+    color: #ffffff !important;
+  }
+
+  //4. OVERRIDE: Tempo aur Note Selectors (Boxes Black, Text White, Border Fixed)
+  tempo-selector, note-selector {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    overflow: hidden !important; 
+    border-radius: 6px !important; 
+  }
+
+  tempo-selector div, note-selector div {
+    background-color: transparent !important;
+  }
+
+  tempo-selector *, note-selector * {
+    color: #ffffff !important;
+  }
+
+  tempo-selector img, note-selector img,
+  tempo-selector svg, note-selector svg {
+    filter: invert(1) !important;
+    background-color: transparent !important;
+  }
+
+  //Buttons override inside controls
+  .controls button {
+    color: #e64c4c !important;
+  }
+  .controls .tempo-wrapper button {
+    color: #fead26 !important;
+  }
+
+  //OVERRIDE: Main Score Area (Background Black, VexFlow Notes White)
+  score-view div#score {
+    background-color: #000000 !important;
+  }
+
+  score-view svg {
+    filter: invert(1) !important;
+  }
+
+  //OVERRIDE: make clarinet and oboe images visible in  Dark mode
+  .clarinet img, .oboe img {
+    filter: invert(1) !important;
+  }
+}
