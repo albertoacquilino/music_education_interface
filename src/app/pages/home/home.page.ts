@@ -80,7 +80,12 @@ export class HomePage implements OnInit {
    * Indicates whether dynamics are enabled.
    */
   useDynamics = false;
-
+  
+  /**
+   * Indicates whether dark mode is enabled.
+   */
+  isDarkMode = false;
+  
   /**
    * The audio context used for playing sounds.
    */
@@ -270,6 +275,34 @@ export class HomePage implements OnInit {
     // Load common settings
     this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage('useFlatsAndSharps', false);
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
+    // dark mode state load & apply
+    this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
+    this.applyDarkMode(this.isDarkMode);
+  }
+  
+  /**
+   * Toggles the Dark Mode.
+   * @param event - The event containing the checked state.
+   * @returns void
+   */
+  switchDarkMode(event: any) {
+    this.isDarkMode = event.detail.checked;
+    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
+    this.applyDarkMode(this.isDarkMode);
+    console.log('Dark Mode:', this.isDarkMode ? 'ON' : 'OFF');
+  }
+
+  /**
+   * Applies the dark theme CSS class to the document body.
+   * @param isDark - Boolean indicating if dark mode should be active.
+   * @returns void
+   */
+  applyDarkMode(isDark: boolean) {
+    if (isDark) {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
   }
 
   /**
