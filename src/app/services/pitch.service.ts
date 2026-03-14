@@ -76,7 +76,7 @@ export class PitchService {
         this.ptr = this.wasmModule._malloc(bigWindow * Float32Array.BYTES_PER_ELEMENT);
         this.ptrPitches = this.wasmModule._malloc(this.n_pitches * Float32Array.BYTES_PER_ELEMENT);
 
-        await this.audioContext.audioWorklet.addModule('audio-accumulator.js');
+        await this.audioContext.audioWorklet.addModule('assets/audio-accumulator.js');
         // Create an instance of your custom AudioWorkletNode
         this.accumNode = new AudioWorkletNode(this.audioContext, 'audio-accumulator', {
             numberOfInputs: 1,
