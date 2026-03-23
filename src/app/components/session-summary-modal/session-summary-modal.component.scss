@@ -1,0 +1,161 @@
+.session-summary-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.session-summary-sheet {
+  width: 100%;
+  max-width: 34rem;
+  border-radius: 1rem 1rem 0.75rem 0.75rem;
+  background: #ffffff;
+  color: #111111;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: sheet-enter 160ms ease-out;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sheet-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.metric-card {
+  border-radius: 0.75rem;
+  background: #f6f7f8;
+  border: 1px solid #e4e6ea;
+  padding: 0.7rem;
+}
+
+.metric-label {
+  margin: 0;
+  color: #6c717a;
+  font-size: 0.78rem;
+}
+
+.metric-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.changes-wrapper {
+  border-radius: 0.75rem;
+  border: 1px solid #e4e6ea;
+  background: #f6f7f8;
+  overflow: hidden;
+}
+
+.change-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.88rem;
+}
+
+.change-row + .change-row {
+  border-top: 1px solid #e4e6ea;
+}
+
+.positive {
+  color: #65d98a;
+}
+
+.negative {
+  color: #ff8d8d;
+}
+
+.neutral {
+  color: #111111;
+}
+
+.feedback-text,
+.first-session {
+  margin: 0;
+  font-size: 0.87rem;
+  color: #666b74;
+}
+
+.sheet-header ion-button {
+  --color: #1d6ef2;
+}
+
+:host-context(.dark-theme) .session-summary-sheet {
+  background: #111111;
+  color: #ffffff;
+}
+
+:host-context(.dark-theme) .session-summary-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:host-context(.dark-theme) .metric-card,
+:host-context(.dark-theme) .changes-wrapper {
+  background: #1b1b1b;
+  border-color: #2a2a2a;
+}
+
+:host-context(.dark-theme) .change-row + .change-row {
+  border-top-color: #2a2a2a;
+}
+
+:host-context(.dark-theme) .metric-label,
+:host-context(.dark-theme) .feedback-text,
+:host-context(.dark-theme) .first-session {
+  color: #c2c2c2;
+}
+
+:host-context(.dark-theme) .sheet-header ion-button {
+  --color: #5ea2ff;
+}
+
+:host-context(.dark-theme) .neutral {
+  color: #ffffff;
+}
+
+@keyframes sheet-enter {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (min-width: 768px) {
+  .session-summary-backdrop {
+    align-items: center;
+    padding: 1rem;
+  }
+
+  .session-summary-sheet {
+    border-radius: 1rem;
+    padding: 1.1rem;
+  }
+}
