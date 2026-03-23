@@ -3,16 +3,19 @@
   inset: 0;
   z-index: 1100;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 0.75rem;
+  padding: 1rem;
   background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
 }
 
 .session-summary-sheet {
-  width: 100%;
-  max-width: 34rem;
-  border-radius: 1rem 1rem 0.75rem 0.75rem;
+  width: 90%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 1rem;
   background: #ffffff;
   color: #111111;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
@@ -20,7 +23,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
-  animation: sheet-enter 160ms ease-out;
+  animation: modal-enter 200ms ease-out;
 }
 
 .sheet-header {
@@ -111,6 +114,7 @@
 
 :host-context(.dark-theme) .session-summary-backdrop {
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
 }
 
 :host-context(.dark-theme) .metric-card,
@@ -137,25 +141,21 @@
   color: #ffffff;
 }
 
-@keyframes sheet-enter {
+@keyframes modal-enter {
   from {
-    transform: translateY(10px);
     opacity: 0;
+    transform: scale(0.95);
   }
   to {
-    transform: translateY(0);
     opacity: 1;
+    transform: scale(1);
   }
 }
 
 @media (min-width: 768px) {
-  .session-summary-backdrop {
-    align-items: center;
-    padding: 1rem;
-  }
-
   .session-summary-sheet {
-    border-radius: 1rem;
-    padding: 1.1rem;
+    width: 85%;
+    max-width: 480px;
+    padding: 1.2rem;
   }
 }
