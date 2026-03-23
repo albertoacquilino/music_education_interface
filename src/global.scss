@@ -24,6 +24,42 @@
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
+
+ion-menu[menuId="settingsMenu"] {
+  --background: #ffffff;
+  --ion-background-color: #ffffff;
+  --ion-text-color: #000000;
+}
+
+ion-menu[menuId="settingsMenu"] ion-content {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-menu[menuId="settingsMenu"] ion-toolbar {
+  --background: #ffffff;
+  --color: #000000;
+  --border-color: #e5e5e5;
+}
+
+ion-menu[menuId="settingsMenu"] ion-list {
+  background: #ffffff;
+}
+
+ion-menu[menuId="settingsMenu"] ion-item {
+  --background: #ffffff;
+  --color: #000000;
+  --border-color: #e5e5e5;
+}
+
+ion-menu[menuId="settingsMenu"] ion-label,
+ion-menu[menuId="settingsMenu"] ion-note,
+ion-menu[menuId="settingsMenu"] ion-select,
+ion-menu[menuId="settingsMenu"] ion-select-option,
+ion-menu[menuId="settingsMenu"] ion-toggle {
+  color: #000000;
+}
+
 // DARK MODE STYLES
 body.dark-theme {
   //turns main background to black and texts to white
@@ -99,5 +135,64 @@ body.dark-theme {
   //OVERRIDE: make clarinet and oboe images visible in  Dark mode
   .clarinet img, .oboe img {
     filter: invert(1) !important;
+  }
+
+  // Ensure bottom tab bar follows dark mode palette.
+  ion-tab-bar,
+  ion-tab-bar.custom-tab-bar {
+    --background: #111111 !important;
+    --color: #cfcfcf !important;
+    --color-selected: #ffffff !important;
+    border-top: 1px solid #2a2a2a !important;
+  }
+
+  ion-tab-button {
+    --color: #cfcfcf !important;
+    --color-selected: #ffffff !important;
+  }
+
+  // Settings menu styles so Options panel does not stay light.
+  ion-menu[menuId="settingsMenu"] {
+    --background: #000000 !important;
+    --ion-background-color: #000000 !important;
+    --ion-text-color: #ffffff !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-content {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-toolbar {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+    --border-color: #1f1f1f !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-list {
+    background: #000000 !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-item {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+    --border-color: #1f1f1f !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-label,
+  ion-menu[menuId="settingsMenu"] ion-note,
+  ion-menu[menuId="settingsMenu"] ion-select,
+  ion-menu[menuId="settingsMenu"] ion-select-option,
+  ion-menu[menuId="settingsMenu"] ion-toggle {
+    color: #ffffff !important;
+  }
+
+  // Keep standalone tuner route dark as well.
+  app-pitchlite,
+  app-pitchlite ion-content,
+  app-pitchlite .chromatic-tuner {
+    --background: #000000 !important;
+    background: #000000 !important;
+    color: #ffffff !important;
   }
 }

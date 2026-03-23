@@ -1,0 +1,21 @@
+:host {
+	ion-tab-bar.custom-tab-bar {
+		--background: #ffffff;
+		--color: #2b2b2b;
+		--color-selected: #111111;
+		border-top: 1px solid #dcdcdc;
+	}
+
+	ion-tab-button {
+		font-weight: 600;
+	}
+}
+
+:host-context(body.dark-theme) {
+	ion-tab-bar.custom-tab-bar {
+		--background: #111111;
+		--color: #cfcfcf;
+		--color-selected: #ffffff;
+		border-top: 1px solid #2a2a2a;
+	}
+}

@@ -16,6 +16,20 @@
     overflow: hidden;
 }
 
+ion-content {
+    --background: #ffffff;
+}
+
+:host-context(body.dark-theme) ion-content {
+    --background: #000000;
+    --color: #ffffff;
+}
+
+:host-context(body.dark-theme) .chromatic-tuner {
+    background: #000000;
+    color: #ffffff;
+}
+
 .chromatic-tuner ::ng-deep .tuner {
     transform: scale(1.5);
     max-width: 100%;
