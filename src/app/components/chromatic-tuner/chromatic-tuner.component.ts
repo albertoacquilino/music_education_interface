@@ -202,23 +202,26 @@ export class ChromaticTunerComponent implements OnInit {
      * @param {number} cents - The cents deviation from the target pitch.
      */
     showEmoji(cents: number) {
-        if (cents == 0) this.currentEmoji = '';
-        else if (cents >= -10 && cents <= 10) {
-            this.currentEmoji = 'happy';
-        } else if ((cents > 10 && cents <= 30) || (cents < -10 && cents >= -30)) {
-            this.currentEmoji = 'confused';
-        } else if (cents > 30 || cents < -30) {
-            this.currentEmoji = 'notHappy';
-        }
+    if (this.detectedPitch == 0) {
+        this.currentEmoji = '';
+        return;
     }
-
+    if (cents == 0) this.currentEmoji = '';
+    else if (cents >= -10 && cents <= 10) {
+        this.currentEmoji = 'happy';
+    } else if ((cents > 10 && cents <= 30) || (cents < -10 && cents >= -30)) {
+        this.currentEmoji = 'confused';
+    } else if (cents > 30 || cents < -30) {
+        this.currentEmoji = 'notHappy';
+    }
+    }
     /**
      * Starts the pitch detection process.
      * Clears the means array and subscribes to the pitch service.
      */
     start() {
         this.meansArray = [];  // Clear the array when starting
-        // this.pitchService.connect();
+        this.pitchService.connect();
         this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
             this.pitchSubject.next(pitch);
         });
@@ -229,7 +232,7 @@ export class ChromaticTunerComponent implements OnInit {
      * @returns {number[]} The array of means calculated during the pitch detection.
      */
     stop(): number[] {
-        // this.pitchService.disconnect();
+        this.pitchService.disconnect();
 
         if (this.pitchSubscription) {
             this.pitchSubscription.unsubscribe();

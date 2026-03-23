@@ -50,7 +50,7 @@ font-size: 1em;
     height: 100%; /* Fill container */
   }
   .simulate-input {
-    background-color: #white;
+    background-color: #fff;
     border: 2px solid #009dda;
     border-radius: 6px;
     padding: 8px 10px;
@@ -58,10 +58,65 @@ font-size: 1em;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    align-items: center;
     color: black;
-    max-width: 200px;
-    max-height: 200px;
+    width: 90%;
+    max-width: 250px;
+    height: 100%;
     box-sizing: border-box;
+    margin: auto;
+  }
+
+  @media screen and (max-width: 480px) {
+    .simulate-input {
+      width: 80%;
+      max-width: 200px;
+    }
+
+    .title-section-wrapper {
+      font-size: 0.9em;
+    }
+  }
+
+  @media screen and (orientation: landscape) {
+    .simulate-input {
+      width: 85%;
+      max-width: 250px;
+      padding: 10px;
+    }
+  }
+
+  @media screen and (min-width: 768px) {
+    .simulate-input {
+      width: 80%;
+      max-width: 230px;
+    }
+
+    .title-section-wrapper {
+      font-size: 1.1em;
+    }
+  }
+
+  @media screen and (min-width: 900px) {
+    .simulate-input {
+      width: 80%;
+      max-width: 300px;
+    }
+
+    .title-section-wrapper {
+      font-size: 1.1em;
+    }
+  }
+
+  @media screen and (min-width: 1200px) {
+    .simulate-input {
+      width: 68%;
+      max-width: 600px;
+    }
+
+    .title-section-wrapper {
+      font-size: 1.5em;
+    }
   }
   `],
   standalone: true,
