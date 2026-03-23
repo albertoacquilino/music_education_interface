@@ -18,6 +18,7 @@ import { ChromaticTunerComponent } from 'src/app/components/chromatic-tuner/chro
 import { NoteSelectorComponent } from 'src/app/components/note-selector/note-selector.component';
 import { ScoreViewComponent } from 'src/app/components/score/score.component';
 import { SemaphoreLightComponent } from 'src/app/components/semaphore-light/semaphore-light.component';
+import { SessionSummaryData, SessionSummaryModalComponent } from 'src/app/components/session-summary-modal/session-summary-modal.component';
 import { TempoSelectorComponent } from 'src/app/components/tempo-selector/tempo-selector.component';
 import { TrumpetDiagramComponent } from 'src/app/components/trumpet-diagram/trumpet-diagram.component';
 import { AppBeat } from 'src/app/models/appbeat.types';
@@ -41,7 +42,7 @@ import { BeatService } from '../../services/beat.service';
     ScoreViewComponent,
     CommonModule, SemaphoreLightComponent,
     TrumpetDiagramComponent, TempoSelectorComponent, NoteSelectorComponent,
-    ChromaticTunerComponent],
+    ChromaticTunerComponent, SessionSummaryModalComponent],
 })
 /**
  * HomePage class represents the home page of the music education interface.
@@ -180,6 +181,11 @@ export class HomePage implements OnInit {
    * An object to collect all the notes played.
    */
   collectedMeansObject: { [key: string]: number[] } = {};
+
+  isSessionSummaryOpen = false;
+  currentSessionSummary: SessionSummaryData = { score: 0, accuracy: 0 };
+  previousSessionSummary: SessionSummaryData | null = null;
+  private readonly lastSessionStorageKey = 'lastSession';
 
   /**
    * Creates an instance of HomePage.
@@ -607,6 +613,7 @@ export class HomePage implements OnInit {
       this.firebase.saveStop('finished', this.collectedMeansObject);
       console.log('finished');
       console.log('Collected Means', this.collectedMeansObject);
+      this.openSessionSummaryModal();
       this.tabsService.setDisabled(false);
     }
   }
@@ -663,6 +670,92 @@ export class HomePage implements OnInit {
     }
     Howler.stop();
     this.firebase.saveStop('interrupted', this.collectedMeansObject);
+    this.openSessionSummaryModal();
+  }
+
+  onSessionSummaryClosed() {
+    this.isSessionSummaryOpen = false;
+    this.saveLastSession(this.currentSessionSummary);
+  }
+
+  private openSessionSummaryModal() {
+    if (this.isSessionSummaryOpen) {
+      return;
+    }
+
+    this.currentSessionSummary = this.buildCurrentSessionSummary();
+    this.previousSessionSummary = this.loadLastSession();
+    this.isSessionSummaryOpen = true;
+  }
+
+  private buildCurrentSessionSummary(): SessionSummaryData {
+    const allMeans = Object.keys(this.collectedMeansObject).reduce((acc: number[], key: string) => {
+      const values = this.collectedMeansObject[key];
+      if (!Array.isArray(values)) {
+        return acc;
+      }
+
+      return acc.concat(values);
+    }, []);
+
+    const validPitches = allMeans.filter((pitch) => Number.isFinite(pitch) && pitch > 0);
+    if (validPitches.length === 0) {
+      return { score: 0, accuracy: 0 };
+    }
+
+    const referenceA4 = Number.isFinite(this.refFrequencyValue$) && this.refFrequencyValue$ > 0
+      ? this.refFrequencyValue$
+      : 440;
+
+    const inTuneCount = validPitches.reduce((count: number, pitch: number) => {
+      const semitoneOffset = Math.round(12 * Math.log2(pitch / referenceA4));
+      const nearestFrequency = referenceA4 * Math.pow(2, semitoneOffset / 12);
+      const centsDifference = 1200 * Math.log2(pitch / nearestFrequency);
+      return Math.abs(centsDifference) <= 10 ? count + 1 : count;
+    }, 0);
+
+    const accuracy = Number(((inTuneCount / validPitches.length) * 100).toFixed(1));
+
+    return {
+      score: inTuneCount,
+      accuracy,
+    };
+  }
+
+  private loadLastSession(): SessionSummaryData | null {
+    try {
+      const raw = localStorage.getItem(this.lastSessionStorageKey);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      const score = Number(parsed?.score);
+      const accuracy = Number(parsed?.accuracy);
+
+      if (!Number.isFinite(score) || !Number.isFinite(accuracy)) {
+        return null;
+      }
+
+      return {
+        score,
+        accuracy,
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  private saveLastSession(session: SessionSummaryData) {
+    const score = Number(session?.score);
+    const accuracy = Number(session?.accuracy);
+
+    const safeSession: SessionSummaryData = {
+      score: Number.isFinite(score) ? score : 0,
+      accuracy: Number.isFinite(accuracy) ? Number(accuracy.toFixed(1)) : 0,
+    };
+
+    localStorage.setItem(this.lastSessionStorageKey, JSON.stringify(safeSession));
   }
 
   /**

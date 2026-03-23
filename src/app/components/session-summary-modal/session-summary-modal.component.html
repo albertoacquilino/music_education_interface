@@ -1,0 +1,48 @@
+<ng-container *ngIf="isOpen">
+  <div class="session-summary-backdrop" (click)="requestClose()">
+    <section
+      class="session-summary-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Session Summary"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="sheet-header">
+        <h2>Session Summary</h2>
+        <ion-button fill="clear" size="small" (click)="requestClose()" aria-label="Close">
+          Close
+        </ion-button>
+      </div>
+
+      <div class="session-grid">
+        <div class="metric-card">
+          <p class="metric-label">Score</p>
+          <p class="metric-value">{{ formatScore(currentSession.score) }}</p>
+        </div>
+        <div class="metric-card">
+          <p class="metric-label">Accuracy</p>
+          <p class="metric-value">{{ formatAccuracy(currentSession.accuracy) }}</p>
+        </div>
+      </div>
+
+      <ng-container *ngIf="hasPreviousSession; else firstSession">
+        <div class="changes-wrapper">
+          <div class="change-row" [ngClass]="trendClass(scoreDiff)">
+            <span>Score change</span>
+            <span>{{ trendArrow(scoreDiff) }} {{ formatSigned(scoreDiff) }}</span>
+          </div>
+          <div class="change-row" [ngClass]="trendClass(accuracyDiff)">
+            <span>Accuracy change</span>
+            <span>{{ trendArrow(accuracyDiff) }} {{ formatSigned(accuracyDiff, 1) }}%</span>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #firstSession>
+        <p class="first-session">This is your first session 🎉</p>
+      </ng-template>
+
+      <p class="feedback-text">{{ feedbackText }}</p>
+    </section>
+  </div>
+</ng-container>
