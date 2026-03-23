@@ -5,15 +5,15 @@
  * Licensed under the GNU Affero General Public License v3.0.
  * See the LICENSE file for more details.
  */
-import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { IonicModule, ViewDidEnter, ViewDidLeave } from '@ionic/angular';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { CommonModule } from '@angular/common';
 import { ScrollImageComponent } from '../../components/scroll-image-selector/scroll-image-selector.component';
 import { ChromaticTunerComponent } from 'src/app/components/chromatic-tuner/chromatic-tuner.component';
 import { RefFreqService } from 'src/app/services/ref-freq.service';
-import { TabsService } from 'src/app/services/tabs.service';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-pitchlite',
@@ -26,7 +26,8 @@ import { Router } from '@angular/router';
 /**
  * PitchComponent class represents the pitch detection interface of the music education application.
  */
-export class PitchComponent implements OnInit, ViewDidEnter, ViewDidLeave {
+export class PitchComponent implements OnInit, OnDestroy, ViewDidEnter, ViewDidLeave {
+  private destroy$ = new Subject<void>();
   @ViewChild(ChromaticTunerComponent) private chromaticTuner!: ChromaticTunerComponent;
 
   /**
@@ -48,7 +49,6 @@ export class PitchComponent implements OnInit, ViewDidEnter, ViewDidLeave {
    */
   constructor(
     private refFreqService: RefFreqService,
-    private tabsService: TabsService,
     private router: Router
   ) { }
 
@@ -58,9 +58,14 @@ export class PitchComponent implements OnInit, ViewDidEnter, ViewDidLeave {
    * @returns void
    */
   ngOnInit(): void {
-    this.refFreqService.getRefFrequency().subscribe(value => {
+    this.refFreqService.getRefFrequency().pipe(takeUntil(this.destroy$)).subscribe(value => {
       this.refFrequencyValue$ = value;
     });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   /**

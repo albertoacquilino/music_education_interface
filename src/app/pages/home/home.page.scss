@@ -6,8 +6,24 @@
  * See the LICENSE file for more details.
  */
 
+@import 'src/theme/breakpoints.scss';
+
 ion-modal {
   --height: auto;
+}
+
+ion-content {
+  --background: white;
+}
+
+#container {
+  min-height: 100%;
+}
+
+@media (min-width: 768px) {
+  #container {
+    background-color: white;
+  }
 }
 
 .top {
@@ -27,6 +43,10 @@ ion-modal {
   border-radius: 0px 0px 6px 6px;
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
 }
 
 .metronome {
@@ -60,10 +80,21 @@ ion-modal {
 
 .wrapper {
   background-color: white;
-  width: 650px;
-  height: 460px;
+  width: 100%;
+  max-width: 650px;
+  margin: 0 auto;
   overflow: hidden;
-  transform-origin: top left;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+
+  @include respond-to-lg {
+    max-width: 900px;
+  }
+
+  @include respond-to-xl {
+    max-width: 1200px;
+  }
 }
 
 @keyframes gradient {
@@ -99,8 +130,32 @@ ion-modal {
   padding: 1em;
   align-items: center;
   justify-content: center;
-  max-width: 400px;
+  width: clamp(180px, 50vw, 400px);
+  max-width: 100%;
 }
+
+.clarinet {
+  grid-area: clarinet;
+  display: flex;
+  padding: 1em;
+  align-items: center;
+  justify-content: center;
+  width: clamp(80px, 20vw, 200px);
+  max-width: 100%;
+  margin-left: clamp(10px, 5vw, 50px);
+}
+
+.oboe {
+  grid-area: oboe;
+  display: flex;
+  padding: 1em;
+  align-items: center;
+  justify-content: center;
+  width: clamp(80px, 20vw, 200px);
+  max-width: 100%;
+  margin-left: clamp(10px, 5vw, 50px);
+}
+
 /* ✅ SPECIFIC OVERRIDE FOR EXACT 320 x 480 */
 @media screen and (width: 320px) and (height: 480px) {
   .clarinet {
@@ -111,26 +166,6 @@ ion-modal {
     width: 100px !important;
     max-width: 100px !important;
   }
-}
-.clarinet {
-  grid-area: clarinet;
-  display: flex;
-  padding: 1em;
-  align-items: center;
-  justify-content: center;
-  width:140px;
-  max-width:140px;
-  margin-left: 50px;
-}
-.oboe {
-  grid-area: oboe;
-  display: flex;
-  padding: 1em;
-  align-items: center;
-  justify-content: center;
-  width:140px;
-  max-width:140px;
-  margin-left: 50px;
 }
 .chromatic-tuner {
   grid-area: chromatic-tuner;
@@ -152,146 +187,74 @@ ion-segment-button {
 }
 
 .score {
-  margin-top:30px;
-  margin-bottom:-20px;
+  margin-top: clamp(1rem, 5vw, 2rem);
+  margin-bottom: clamp(-1rem, -3vw, -0.5rem);
   grid-area: score;
   text-align: center;
+  width: 100%;
 
-  app-score {
+  score-view {
+    display: block;
+    width: 100%;
     min-width: 150px;
     min-height: 90px;
-    max-width: 600px;
   }
 }
 
-.bottom {
-  //display: grid;
-  //grid-template-columns: 1fr 1fr 1fr;
-  //grid-template-rows: 1fr 1.3fr;
-  //gap: 0px 0px;
-  //grid-auto-flow: row;
-  //grid-template-areas:
-  /*    "controls controls controls"
-    "controls controls controls"
-    "start-stop start-stop start-stop";*/
-  //grid-area: bottom;
-}
+.bottom {}
 
-.start-stop {
-  grid-area: start-stop;
-}
-
-.start-btn {
-  background-color: #009dda;
-  border: 0;
-  border-radius: 4px;
-  padding: 0.6em;
-  font-size: 1.1em;
-  color: white;
-  margin-top: 1em;
-  text-transform: uppercase;
-}
-
-.start-btn:hover {
-  background-color: #008dc2;
-  cursor: pointer;
-}
 
 .controls {
-  display: flex;
-  //grid-area: controls;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "tempo tempo"
+    "low   high";
+  gap: clamp(0.5rem, 2vw, 1rem);
   background-color: white;
-  padding: 18px;
-  //margin: 6px;
-  //border-radius: 6px;
-  justify-content: center;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
 }
 
-.controls button {
-  /*width: 75%;*/
-  font-size: 2em;
-  background-color: transparent;
-  border: 0;
-  cursor: pointer;
-  color: #e64c4c;
-}
-
-.controls button:hover {
-  color: #c73b3b;
-}
-
-.controls .tempo-wrapper button {
-  color: #fead26;
-}
-
-.controls .tempo-wrapper button:hover {
-  color: #ce8b1c;
-}
-
-.up-tempo,
-.down-tempo,
-.up-low-note,
-.down-low-note,
-.up-high-note,
-.down-high-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.tempo-wrapper   { grid-area: tempo; }
+.low-note-wrapper  { grid-area: low; }
+.high-note-wrapper { grid-area: high; }
 
 .tempo-wrapper,
 .low-note-wrapper,
 .high-note-wrapper {
-  //flex: 1;
-  //border-right: 1px solid lightgray;
-  // padding:0 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  //padding-top: 10px;
-  padding-right: 30px;
-}
-
-.high-note-wrapper {
-  border-right: 0px;
-}
-
-.start-stop button {
   width: 100%;
+  min-width: 0;
+  padding: 0;
 }
 
-#action {
-  font-size: small;
-  text-align: center;
-}
 
-#trumpet-position {
-  width: 100%;
-}
-#clarinet-position{
-  width:10%;
-}
-#oboe-position{
-  width:10%;
-}
 #score-image {
   width: 100%;
   //margin: 10px;
   border-radius:6px;
 }
 
-#low-note {
-  width: 100%;
+
+// Landscape phones and tablets — all three controls in one row
+@media (orientation: landscape), (min-width: 540px) {
+  .controls {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-areas: "tempo low high";
+  }
 }
 
-#high-note {
-  width: 100%;
+.top-middle-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-// aleksandra add code
-
-@media screen and (orientation: landscape) {
+// Responsive layout adjustments
+@include landscape {
   #container {
     display: flex;
     flex-direction: column;
@@ -304,24 +267,14 @@ ion-segment-button {
     width: 100%;
   }
 
-  // .bottom {
-  //   width: 50%;
-  // }
-
-  .controls {
-    //flex-direction: column;
-    gap: 10px;
-    margin-top: 0px;
-  }
-
-  @media screen and (max-height: 600px)  {
-    .clarinet{
+  @media screen and (max-height: 600px) {
+    .clarinet {
       max-width: 150px;
-      margin-left:-40px;
+      margin-left: -40px;
     }
-    .oboe{
+    .oboe {
       max-width: 150px;
-      margin-left:-40px;
+      margin-left: -40px;
     }
     .landscape-d-none {
       display: none;
@@ -332,21 +285,80 @@ ion-segment-button {
     .top-middle-container {
       display: flex;
     }
-  .score {
-    margin-left: -100px; /* Shift left in landscape */
-    max-width:250px ;
-  }
+    .score {
+      margin-left: -100px;
+      max-width: 250px;
+    }
   }
 }
-html, body, .ion-app, .ion-page, #container, .wrapper, ion-modal {
-  background-color: white !important;
-  min-width: 100vw;
-  min-height:90vh;
-  color: black;
-  margin: 0;
-  padding: 0 !important;
-  box-sizing: border-box;
-  overflow: hidden !important;
-  position: fixed !important; /* prevent scroll via body/html */
- overscroll-behavior: none !important; /* block iOS/Android pull-bounce */
+
+// Landscape side-by-side layout for short-height devices (Nest Hub, landscape tablets)
+@media (orientation: landscape) and (max-height: 650px) {
+  .top-middle-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    align-items: stretch;
+    height: 100%;
+  }
+
+  .top {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+  }
+
+  .middle {
+    grid-column: 2;
+    grid-row: 1;
+    flex: unset;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score {
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+
+// Small phones
+@media (max-width: 480px) {
+  #container {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .controls {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+}
+
+// Start/Stop button
+ion-footer {
+  ion-button {
+    margin: 8px auto;
+    display: block;
+    width: 100%;
+    max-width: 320px;
+
+    @include respond-to-md {
+      max-width: 400px;
+      --padding-top: 14px;
+      --padding-bottom: 14px;
+      font-size: 1.1rem;
+    }
+
+    @include respond-to-lg {
+      max-width: 480px;
+      --padding-top: 16px;
+      --padding-bottom: 16px;
+      font-size: 1.2rem;
+    }
+  }
 }

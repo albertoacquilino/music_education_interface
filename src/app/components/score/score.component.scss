@@ -1,0 +1,30 @@
+/*
+ * This file is part of the Music Education Interface project.
+ * Copyright (C) 2025 Alberto Acquilino
+ *
+ * Licensed under the GNU Affero General Public License v3.0.
+ * See the LICENSE file for more details.
+ */
+
+@import 'src/theme/breakpoints.scss';
+
+score-view {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+#score {
+  background-color: white;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+@include portrait {
+  #score {
+    min-height: 300px;
+  }
+}
