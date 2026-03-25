@@ -24,6 +24,139 @@
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
+
+ion-modal.note-modal {
+  --width: 90vw;
+  --max-width: 480px;
+  --height: auto;
+  --max-height: 80vh;
+  --border-radius: 14px;
+  --overflow: hidden;
+  --background: #ffffff;
+  --color: #000000;
+  --note-modal-bg: #ffffff;
+  --note-modal-text: #000000;
+
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+ion-modal {
+  --ion-backdrop-color: #000000;
+  --backdrop-opacity: 0.35;
+}
+
+ion-menu[menuId="settingsMenu"] {
+  --background: #ffffff;
+  --ion-background-color: #ffffff;
+  --ion-text-color: #000000;
+}
+
+ion-menu[menuId="settingsMenu"] ion-content {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-menu[menuId="settingsMenu"] ion-toolbar {
+  --background: #ffffff;
+  --color: #000000;
+  --border-color: #e5e5e5;
+}
+
+ion-menu[menuId="settingsMenu"] ion-list {
+  background: #ffffff;
+}
+
+ion-menu[menuId="settingsMenu"] ion-item {
+  --background: #ffffff;
+  --color: #000000;
+  --border-color: #e5e5e5;
+}
+
+ion-menu[menuId="settingsMenu"] ion-label,
+ion-menu[menuId="settingsMenu"] ion-note,
+ion-menu[menuId="settingsMenu"] ion-select,
+ion-menu[menuId="settingsMenu"] ion-select-option,
+ion-menu[menuId="settingsMenu"] ion-toggle {
+  color: #000000;
+}
+
+// Overlay theme used by settings menu select popups (instrument + nomenclature).
+ion-popover.settings-select-overlay,
+ion-alert.settings-select-overlay {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-popover.settings-select-overlay ion-select-popover,
+ion-popover.settings-select-overlay ion-list,
+ion-popover.settings-select-overlay ion-item {
+  --background: #ffffff;
+  --color: #000000;
+  --ion-background-color: #ffffff;
+  --ion-text-color: #000000;
+  background: #ffffff;
+  color: #000000;
+}
+
+ion-popover.settings-select-overlay ion-item.item-radio-checked {
+  --background: #f2f2f2;
+  background: #f2f2f2;
+}
+
+ion-alert.settings-select-overlay .alert-wrapper {
+  background: #ffffff;
+  color: #000000;
+}
+
+ion-alert.settings-select-overlay .alert-radio-label,
+ion-alert.settings-select-overlay .alert-button,
+ion-alert.settings-select-overlay .alert-title,
+ion-alert.settings-select-overlay .alert-sub-title,
+ion-alert.settings-select-overlay .alert-message {
+  color: #000000;
+}
+
+ion-picker.settings-picker-overlay {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-picker.tempo-picker-overlay {
+  --background: #ffffff;
+  --color: #000000;
+}
+
+ion-picker.tempo-picker-overlay .picker-wrapper {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(90vw, 480px) !important;
+  max-width: 480px !important;
+  border-radius: 14px !important;
+}
+
+body:not(.dark-theme) ion-picker.tempo-picker-overlay .picker-opt {
+  color: #000000 !important;
+}
+
+body:not(.dark-theme) ion-picker.tempo-picker-overlay .picker-opt[aria-selected="true"],
+body:not(.dark-theme) ion-picker.tempo-picker-overlay .picker-opt.picker-opt-selected {
+  color: var(--ion-color-primary, #3880ff) !important;
+}
+
+body:not(.dark-theme) ion-picker.settings-picker-overlay .picker-opt {
+  color: #000000 !important;
+}
+
+body:not(.dark-theme) ion-picker.settings-picker-overlay .picker-opt[aria-selected="true"],
+body:not(.dark-theme) ion-picker.settings-picker-overlay .picker-opt.picker-opt-selected {
+  color: var(--ion-color-primary, #3880ff) !important;
+}
+
 // DARK MODE STYLES
 body.dark-theme {
   //turns main background to black and texts to white
@@ -100,4 +233,163 @@ body.dark-theme {
   .clarinet img, .oboe img {
     filter: invert(1) !important;
   }
+
+  //OVERRIDE: trumpet valve boundaries visible in dark mode
+  trumpet-diagram svg [stroke="black"] {
+    stroke: #404040 !important;
+  }
+
+  // Ensure bottom tab bar follows dark mode palette.
+  ion-tab-bar,
+  ion-tab-bar.custom-tab-bar {
+    --background: #111111 !important;
+    --color: #cfcfcf !important;
+    --color-selected: #ffffff !important;
+    border-top: 1px solid #2a2a2a !important;
+  }
+
+  ion-tab-button {
+    --color: #cfcfcf !important;
+    --color-selected: #ffffff !important;
+  }
+
+  // Settings menu styles so Options panel does not stay light.
+  ion-menu[menuId="settingsMenu"] {
+    --background: #000000 !important;
+    --ion-background-color: #000000 !important;
+    --ion-text-color: #ffffff !important;
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  ion-menu[menuId="settingsMenu"]::part(container) {
+    border-inline-end: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-content {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-toolbar {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+    --border-color: rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-list {
+    background: #000000 !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-item {
+    --background: #000000 !important;
+    --color: #ffffff !important;
+    --border-color: #1f1f1f !important;
+  }
+
+  ion-menu[menuId="settingsMenu"] ion-label,
+  ion-menu[menuId="settingsMenu"] ion-note,
+  ion-menu[menuId="settingsMenu"] ion-select,
+  ion-menu[menuId="settingsMenu"] ion-select-option,
+  ion-menu[menuId="settingsMenu"] ion-toggle {
+    color: #ffffff !important;
+  }
+
+  // Keep standalone tuner route dark as well.
+  app-pitchlite,
+  app-pitchlite ion-content,
+  app-pitchlite .chromatic-tuner {
+    --background: #000000 !important;
+    background: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  ion-popover::part(content),
+  ion-alert::part(wrapper) {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  }
+
+  ion-popover.settings-select-overlay::part(content),
+  ion-alert.settings-select-overlay::part(wrapper) {
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32) !important;
+  }
+
+  ion-popover.settings-select-overlay,
+  ion-alert.settings-select-overlay {
+    --background: #111111 !important;
+    --color: #ffffff !important;
+  }
+
+  ion-popover.settings-select-overlay ion-select-popover,
+  ion-popover.settings-select-overlay ion-list,
+  ion-popover.settings-select-overlay ion-item {
+    --background: #111111 !important;
+    --color: #ffffff !important;
+    --ion-background-color: #111111 !important;
+    --ion-text-color: #ffffff !important;
+    background: #111111 !important;
+    color: #ffffff !important;
+  }
+
+  ion-popover.settings-select-overlay ion-item.item-radio-checked {
+    --background: #3a3a3a !important;
+    background: #3a3a3a !important;
+  }
+
+  ion-alert.settings-select-overlay .alert-wrapper {
+    background: #111111 !important;
+    color: #ffffff !important;
+    border: 1px solid #2a2a2a;
+  }
+
+  ion-alert.settings-select-overlay .alert-radio-group,
+  ion-alert.settings-select-overlay .alert-button-group {
+    border-color: #2a2a2a !important;
+  }
+
+  ion-alert.settings-select-overlay .alert-radio-label,
+  ion-alert.settings-select-overlay .alert-button,
+  ion-alert.settings-select-overlay .alert-title,
+  ion-alert.settings-select-overlay .alert-sub-title,
+  ion-alert.settings-select-overlay .alert-message {
+    color: #ffffff !important;
+  }
+
+  ion-picker.settings-picker-overlay {
+    --background: #111111 !important;
+    --color: #ffffff !important;
+  }
+}
+
+body.dark-theme ion-modal {
+  --ion-backdrop-color: #000000;
+  --backdrop-opacity: 0.55;
+  background-color: transparent !important;
+}
+
+body.dark-theme ion-modal.note-modal {
+  --background: #111111;
+  --color: #ffffff;
+  --note-modal-bg: #111111;
+  --note-modal-text: #ffffff;
+}
+
+body.dark-theme ion-picker.tempo-picker-overlay {
+  --background: #111111;
+  --color: #ffffff;
+}
+
+body.dark-theme ion-picker.tempo-picker-overlay .picker-opt {
+  color: #ffffff !important;
+}
+
+body.dark-theme ion-picker.tempo-picker-overlay .picker-opt[aria-selected="true"],
+body.dark-theme ion-picker.tempo-picker-overlay .picker-opt.picker-opt-selected {
+  color: var(--ion-color-primary, #4c8dff) !important;
+}
+
+body.dark-theme ion-modal.note-modal scroll-image-component img {
+  filter: invert(1) !important;
 }

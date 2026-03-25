@@ -45,7 +45,8 @@ const TICK_SOUND = new Howl({ src: ['assets/sounds/tick_weak.wav'] });
       position: relative;
       height: 300px; /* Set the desired height */
       width: 100%; /* Set the desired width */
-      background-color: white;
+            background-color: var(--note-modal-bg, #ffffff);
+            color: var(--note-modal-text, #000000);
       overscroll-behavior-y: contain;
     }
 
@@ -69,6 +70,7 @@ const TICK_SOUND = new Howl({ src: ['assets/sounds/tick_weak.wav'] });
       left: 0;
       height: 100%;
       width: 100%;
+            background-color: var(--note-modal-bg, #ffffff);
       img {
         position: absolute;
         top: 0;

@@ -30,7 +30,6 @@ import { MAXTEMPO, MINTEMPO } from 'src/app/constants';
         <span id="tempo">{{ tempo }} bpm</span>
     </h1>
   </div>
-  
   </div>
   `,
   styles: [`
@@ -39,15 +38,16 @@ import { MAXTEMPO, MINTEMPO } from 'src/app/constants';
     text-align: center;
     margin:10px 10px 10px 10px;
   }
-.title-section-wrapper{
-font-size: 1em;
-}
+  .title-section-wrapper{
+    font-size: 1em;
+  }
   .tempo {
     flex-grow: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     height: 100%; /* Fill container */
+    cursor: pointer;
   }
   .simulate-input {
     background-color: #fff;
@@ -184,6 +184,7 @@ export class TempoSelectorComponent implements OnInit {
 
     // Create the picker with the tempo options
     const picker = await this._picker.create({
+      cssClass: 'tempo-picker-overlay',
       columns: [
         {
           name: 'tempo',

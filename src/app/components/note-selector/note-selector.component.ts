@@ -29,8 +29,7 @@ import { ScrollImageComponent } from '../scroll-image-selector/scroll-image-sele
         </div>
         <ion-modal [trigger]="_id"
             [canDismiss]="canDismiss"
-            [initialBreakpoint]="1"
-            [breakpoints]="[0, 1]"
+          cssClass="note-modal"
             [handle]="false"
             >
             <ng-template>

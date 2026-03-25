@@ -17,7 +17,13 @@
       <!-- Instrument Selection -->
       <ion-item [disabled]="isPlaying()">
         <ion-label>Select Instrument</ion-label>
-        <ion-select (ionChange)="selectInstrument($event)" mode="ios" [value]="selectedInstrument" interface="popover">
+        <ion-select
+          (ionChange)="selectInstrument($event)"
+          mode="ios"
+          [value]="selectedInstrument"
+          interface="popover"
+          [interfaceOptions]="instrumentSelectInterfaceOptions"
+        >
           <ion-select-option value="trumpet">
             <ion-label>
               Trumpet
@@ -71,7 +77,12 @@
         </ion-item>
         <ion-item [disabled]="isPlaying()">
           <ion-label>Nomenclature</ion-label>
-          <ion-select (ionChange)=" changeLanguage ($event)" value="{{language}}">
+          <ion-select
+            (ionChange)=" changeLanguage ($event)"
+            value="{{language}}"
+            interface="alert"
+            [interfaceOptions]="nomenclatureSelectInterfaceOptions"
+          >
           <ion-select-option value="en">C, D, E</ion-select-option> 
           <ion-select-option value="it">Do, Re, Mi</ion-select-option>
           </ion-select> 

@@ -346,3 +346,15 @@ html, body, .ion-app, .ion-page, #container, .wrapper, ion-modal {
   position: fixed !important; /* prevent scroll via body/html */
  overscroll-behavior: none !important; /* block iOS/Android pull-bounce */
 }
+
+ion-footer {
+  --background: #ffffff;
+  --ion-toolbar-background: #ffffff;
+  background: #ffffff;
+}
+
+:host-context(body.dark-theme) ion-footer {
+  --background: #111111;
+  --ion-toolbar-background: #111111;
+  background: #111111;
+}

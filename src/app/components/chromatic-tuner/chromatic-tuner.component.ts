@@ -6,13 +6,14 @@
  * See the LICENSE file for more details.
  */
 
-import { ChangeDetectorRef, Component, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, OnInit, OnDestroy } from '@angular/core';
 import { Observable, map, tap, Subject, bufferTime, Subscription, BehaviorSubject, bufferCount } from 'rxjs';
 import { PitchService } from 'src/app/services/pitch.service';
 import { IonicModule } from '@ionic/angular';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScrollImageComponent } from '../scroll-image-selector/scroll-image-selector.component';
 import { CommonModule } from '@angular/common';
+import { RefFreqService } from 'src/app/services/ref-freq.service';//to inject global service
 const baseNotes: { [note: string]: { freq: number, key: number } } = {
     "A0": { "freq": 27.5, "key": 1 }, "A#0/Bb0": { "freq": 29.14, "key": 2 }, "B0": { "freq": 30.87, "key": 3 },
     "C1": { "freq": 32.7, "key": 4 }, "C#1/Db1": { "freq": 34.65, "key": 5 }, "D1": { "freq": 36.71, "key": 6 },
@@ -66,7 +67,7 @@ const maxCents = 40;
     standalone: true,
     imports: [IonicModule, FontAwesomeModule, CommonModule]
 })
-export class ChromaticTunerComponent implements OnInit {
+export class ChromaticTunerComponent implements OnInit, OnDestroy {
     /**
      * Reference frequency value in Hz for tuning.
      * @type {number}
@@ -97,10 +98,12 @@ export class ChromaticTunerComponent implements OnInit {
     currentCents: number = 0;
 
     meansArray: number[] = [];  // Array to store the means
+    private freqSubscription!: Subscription;//to track Service
 
     constructor(
         private pitchService: PitchService,
-        private changeDetectorRef: ChangeDetectorRef
+        private changeDetectorRef: ChangeDetectorRef,
+        private refFreqService: RefFreqService
     ) {
         this.pitch$ = this.pitchSubject.pipe(
             bufferCount(4),
@@ -165,12 +168,27 @@ export class ChromaticTunerComponent implements OnInit {
      * Initializes the component and subscribes to the note observable.
      */
     ngOnInit() {
-        this.updateNotes();
+        //Bypass parent OnPush blocks by subscribing directly to the global state!
+        this.freqSubscription = this.refFreqService.getRefFrequency().subscribe(value => {
+            this.refFrequencyValue$ = value;
+            console.log(`[Tuner] A4 Calibration Auto-Updated to: ${value} Hz`);
+            this.updateNotes(); // Table instantly recalibrate to new value
+            this.changeDetectorRef.detectChanges(); // force update UI
+        });
         this.note$.subscribe((note) => {
             this.currentNote = note.note;
             this.currentCents = note.cents;
             this.changeDetectorRef.detectChanges();
         });
+    }
+  
+   /**
+     * Clean up subscriptions to prevent memory leaks.
+     */
+    ngOnDestroy() {
+        if (this.freqSubscription) {
+            this.freqSubscription.unsubscribe();
+        }
     }
 
     /**
