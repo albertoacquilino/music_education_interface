@@ -57,6 +57,6 @@ export class AppComponent implements AfterViewInit {
     }
 
     // start the pitch monitoring service
-    this.pitchService.connect()
+    // pitch monitoring will be started by the exercise component when needed
   }
 }
