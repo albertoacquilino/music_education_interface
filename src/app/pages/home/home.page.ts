@@ -5,7 +5,7 @@
  * Licensed under the GNU Affero General Public License v3.0.
  * See the LICENSE file for more details.
  */
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { AlertController, IonicModule, PickerController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -13,11 +13,12 @@ import { Mute } from '@capgo/capacitor-mute';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCircleChevronDown, faCircleChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { range } from 'lodash';
-import { Observable, interval, tap } from 'rxjs';
+import { Observable, Subscription, interval, tap } from 'rxjs';
 import { ChromaticTunerComponent } from 'src/app/components/chromatic-tuner/chromatic-tuner.component';
 import { NoteSelectorComponent } from 'src/app/components/note-selector/note-selector.component';
 import { ScoreViewComponent } from 'src/app/components/score/score.component';
 import { SemaphoreLightComponent } from 'src/app/components/semaphore-light/semaphore-light.component';
+import { SessionSummaryData, SessionSummaryModalComponent } from 'src/app/components/session-summary-modal/session-summary-modal.component';
 import { TempoSelectorComponent } from 'src/app/components/tempo-selector/tempo-selector.component';
 import { TrumpetDiagramComponent } from 'src/app/components/trumpet-diagram/trumpet-diagram.component';
 import { AppBeat } from 'src/app/models/appbeat.types';
@@ -28,6 +29,7 @@ import { RefFreqService } from 'src/app/services/ref-freq.service';
 import { SoundsService } from 'src/app/services/sounds.service';
 import { TabsService } from 'src/app/services/tabs.service';
 import { scoreFromNote } from 'src/app/utils/score.utils';
+import { calculateDominantPitchMean, frequencyToNoteName, expectedLabelToNoteName } from 'src/app/utils/pitch.utils';
 import { DYNAMICS, INITIAL_NOTE, MAXCYCLES, MAXREFFREQUENCY, MAXTEMPO, MINREFFREQUENCY, MINTEMPO, TRUMPET_NOTES, CLARINET_NOTES, POSITIONS, TRUMPET_BTN, CLARINET_POSITIONS,OBOE_NOTES,OBOE_POSITIONS} from '../../constants';
 import { BeatService } from '../../services/beat.service';
 
@@ -41,12 +43,12 @@ import { BeatService } from '../../services/beat.service';
     ScoreViewComponent,
     CommonModule, SemaphoreLightComponent,
     TrumpetDiagramComponent, TempoSelectorComponent, NoteSelectorComponent,
-    ChromaticTunerComponent],
+    ChromaticTunerComponent, SessionSummaryModalComponent],
 })
 /**
  * HomePage class represents the home page of the music education interface.
  */
-export class HomePage implements OnInit {
+export class HomePage implements OnInit, OnDestroy {
   @ViewChild(ChromaticTunerComponent) private chromaticTuner!: ChromaticTunerComponent;
 
   /**
@@ -185,6 +187,18 @@ export class HomePage implements OnInit {
    */
   collectedMeansObject: { [key: string]: number[] } = {};
 
+  isSessionSummaryOpen = false;
+  currentSessionSummary: SessionSummaryData = { score: 0, accuracy: 0 };
+  previousSessionSummary: SessionSummaryData | null = null;
+  private readonly lastSessionStorageKey = 'lastSession';
+  private backgroundPitchSubscription: Subscription | null = null;
+  private bufferedPitchSamples: number[] = [];
+  private activeMeasureMeans: number[] = [];
+  private correctNotes: number = 0;
+  private incorrectNotes: number = 0;
+  private previousDetectedNote: string = '';
+  private collectingMeasurePitch = false;
+
   /**
    * Creates an instance of HomePage.
    * @param _picker - The picker controller.
@@ -249,6 +263,37 @@ export class HomePage implements OnInit {
       this.refFrequencyValue$ = value;
     });
     this.loadStateFromLocalStorage();
+  }
+
+  ngOnDestroy(): void {
+    this.backgroundPitchSubscription?.unsubscribe();
+    this.backgroundPitchSubscription = null;
+    this.collectingMeasurePitch = false;
+    this.bufferedPitchSamples = [];
+    this.activeMeasureMeans = [];
+  }
+
+  
+
+  private startMeasurePitchCollection() {
+    this.collectingMeasurePitch = true;
+    this.bufferedPitchSamples = [];
+    this.activeMeasureMeans = [];
+  }
+
+  private stopMeasurePitchCollection(): number[] {
+    this.collectingMeasurePitch = false;
+    this.bufferedPitchSamples = [];
+    const meansArray = this.activeMeasureMeans;
+    this.activeMeasureMeans = [];
+    return meansArray;
+  }
+
+  private appendCollectedMeans(meansArray: number[]) {
+    this.collectedMeansObject = {
+      ...this.collectedMeansObject,
+      [Object.keys(this.collectedMeansObject).length + 1]: meansArray
+    };
   }
 
   /**
@@ -337,6 +382,7 @@ export class HomePage implements OnInit {
    */
   ionViewWillLeave(): void {
     this._tempo.stop();
+    this.stopMeasurePitchCollection();
     if (this.mode == "tuner") this.chromaticTuner.stop();
   }
 
@@ -569,6 +615,8 @@ export class HomePage implements OnInit {
     if (tempo.beat == 0) {
       if (tempo.measure == 0) {
         this.currentNote = this.nextNote();
+        // reset previous detected note so the new target can be counted
+        this.previousDetectedNote = '';
         this._sounds.currentNote = this.currentNote;
         this.updateScore(this.currentNote);
         if (this.selectedInstrument === "trumpet") {
@@ -583,12 +631,11 @@ export class HomePage implements OnInit {
       switch (tempo.measure) {
         case 0:
           this.currentAction = "Rest";
+
+          this.appendCollectedMeans(this.stopMeasurePitchCollection());
+
           if (this.mode == 'tuner') {
-            const meansArray = this.chromaticTuner.stop();
-            this.collectedMeansObject = {
-              ...this.collectedMeansObject,
-              [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-            };
+            this.chromaticTuner.stop();
           }
           break;
         case 1:
@@ -596,6 +643,9 @@ export class HomePage implements OnInit {
           break;
         case 2:
           this.currentAction = "Play";
+
+          this.startMeasurePitchCollection();
+
           if (this.mode == 'tuner') {
             this.chromaticTuner.start();
           }
@@ -608,9 +658,24 @@ export class HomePage implements OnInit {
     }
 
     if (tempo.cycle === MAXCYCLES) {
+      // finalize any remaining collected pitch data
+      this.appendCollectedMeans(this.stopMeasurePitchCollection());
+
+      if (this.backgroundPitchSubscription) {
+        this.backgroundPitchSubscription.unsubscribe();
+        this.backgroundPitchSubscription = null;
+      }
+
+      try {
+        this.pitchService.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting pitch service after finish', e);
+      }
+
       this.firebase.saveStop('finished', this.collectedMeansObject);
       console.log('finished');
       console.log('Collected Means', this.collectedMeansObject);
+      this.openSessionSummaryModal();
       this.tabsService.setDisabled(false);
     }
   }
@@ -637,6 +702,61 @@ export class HomePage implements OnInit {
    */
   start() {
     this.collectedMeansObject = {};
+    // reset note counters for a fresh session
+    this.correctNotes = 0;
+    this.incorrectNotes = 0;
+    this.previousDetectedNote = '';
+
+    // Initialize pitch detection for the exercise session and subscribe to pitch stream
+    this.pitchService.connect().then(() => {
+      if (!this.backgroundPitchSubscription) {
+        this.backgroundPitchSubscription = this.pitchService.pitch$.subscribe((pitch: number) => {
+          if (!this.collectingMeasurePitch || !Number.isFinite(pitch) || pitch <= 0) {
+            return;
+          }
+
+          this.bufferedPitchSamples.push(pitch);
+
+          if (this.bufferedPitchSamples.length < 4) {
+            return;
+          }
+
+          const bufferedMean = calculateDominantPitchMean(this.bufferedPitchSamples);
+          this.bufferedPitchSamples = [];
+
+          if (bufferedMean <= 0) {
+            return;
+          }
+
+          // Convert mean frequency to a note name and compare with expected note(s)
+          const detectedNote = frequencyToNoteName(bufferedMean);
+          if (!detectedNote) {
+            // ignore frames where no pitch is detected
+            return;
+          }
+
+          const expectedLabels = this.NOTES[this.currentNote];
+          const expectedNames = expectedLabels.map(l => expectedLabelToNoteName(l));
+          const match = expectedNames.includes(detectedNote);
+
+          // Skip duplicate detections to avoid counting the same sustained note multiple times
+          if (detectedNote !== this.previousDetectedNote) {
+            if (match) this.correctNotes++;
+            else this.incorrectNotes++;
+            this.previousDetectedNote = detectedNote;
+            // console.log(`Detected: ${detectedNote}, Expected: ${expectedNames.join('/')}, Match: ${match}`);
+          } else {
+            // duplicate frame for same detected note — ignore for scoring
+            // console.log(`Ignored duplicate detected note: ${detectedNote}`);
+          }
+
+          if (this.activeMeasureMeans.length === 0 || this.activeMeasureMeans[this.activeMeasureMeans.length - 1] !== bufferedMean) {
+            this.activeMeasureMeans.push(bufferedMean);
+          }
+        });
+      }
+    }).catch((error) => console.error('Unable to start pitch detection for exercise', error));
+
     this._tempo.start();
     this.firebase.saveStart(
       this.tempo$.value,
@@ -654,19 +774,110 @@ export class HomePage implements OnInit {
    */
   stop() {
     this._tempo.stop();
+
     if (this.mode == 'tuner') {
-      const meansArray = this.chromaticTuner.stop();
-      this.collectedMeansObject = {
-        ...this.collectedMeansObject,
-        [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-      };
-      console.log('Collected Means', this.collectedMeansObject);
+      this.chromaticTuner.stop();
     }
-    else if (this.mode == this.selectedInstrument) {
-      // this.pitchService.disconnect();
+
+    // collect remaining measure data and cleanup pitch monitoring
+    this.appendCollectedMeans(this.stopMeasurePitchCollection());
+    console.log('Collected Means', this.collectedMeansObject);
+
+    if (this.backgroundPitchSubscription) {
+      this.backgroundPitchSubscription.unsubscribe();
+      this.backgroundPitchSubscription = null;
     }
+
+    try {
+      this.pitchService.disconnect();
+    } catch (e) {
+      console.warn('Error disconnecting pitch service', e);
+    }
+
     Howler.stop();
     this.firebase.saveStop('interrupted', this.collectedMeansObject);
+    this.openSessionSummaryModal();
+  }
+
+  onSessionSummaryClosed() {
+    this.isSessionSummaryOpen = false;
+    this.saveLastSession(this.currentSessionSummary);
+  }
+
+  private openSessionSummaryModal() {
+    if (this.isSessionSummaryOpen) {
+      return;
+    }
+
+    this.currentSessionSummary = this.buildCurrentSessionSummary();
+    this.previousSessionSummary = this.loadLastSession();
+    this.isSessionSummaryOpen = true;
+  }
+
+  private buildCurrentSessionSummary(): SessionSummaryData {
+    // Build session summary based solely on note equality counts
+    const totalNotes = this.correctNotes + this.incorrectNotes;
+    if (totalNotes === 0) {
+      return { score: 0, accuracy: 0, totalNotes: 0, correctNotes: 0, incorrectNotes: 0 };
+    }
+
+    const accuracy = Number(((this.correctNotes / totalNotes) * 100).toFixed(1));
+
+    return {
+      score: this.correctNotes,
+      accuracy,
+      totalNotes,
+      correctNotes: this.correctNotes,
+      incorrectNotes: this.incorrectNotes,
+    };
+  }
+
+  private loadLastSession(): SessionSummaryData | null {
+    try {
+      const raw = localStorage.getItem(this.lastSessionStorageKey);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw);
+      const score = Number(parsed?.score);
+      const accuracy = Number(parsed?.accuracy);
+      const totalNotes = Number(parsed?.totalNotes);
+      const correctNotes = Number(parsed?.correctNotes);
+      const incorrectNotes = Number(parsed?.incorrectNotes);
+
+      if (!Number.isFinite(score) || !Number.isFinite(accuracy)) {
+        return null;
+      }
+
+      return {
+        score,
+        accuracy,
+        totalNotes: Number.isFinite(totalNotes) ? totalNotes : 0,
+        correctNotes: Number.isFinite(correctNotes) ? correctNotes : 0,
+        incorrectNotes: Number.isFinite(incorrectNotes) ? incorrectNotes : 0,
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  private saveLastSession(session: SessionSummaryData) {
+    const score = Number(session?.score);
+    const accuracy = Number(session?.accuracy);
+    const totalNotes = Number(session?.totalNotes);
+    const correctNotes = Number(session?.correctNotes);
+    const incorrectNotes = Number(session?.incorrectNotes);
+
+    const safeSession: SessionSummaryData = {
+      score: Number.isFinite(score) ? score : 0,
+      accuracy: Number.isFinite(accuracy) ? Number(accuracy.toFixed(1)) : 0,
+      totalNotes: Number.isFinite(totalNotes) ? totalNotes : 0,
+      correctNotes: Number.isFinite(correctNotes) ? correctNotes : 0,
+      incorrectNotes: Number.isFinite(incorrectNotes) ? incorrectNotes : 0,
+    };
+
+    localStorage.setItem(this.lastSessionStorageKey, JSON.stringify(safeSession));
   }
 
   /**

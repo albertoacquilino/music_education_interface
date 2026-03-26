@@ -8,6 +8,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import * as pitchlite from 'src/app/services/pitchlite';
+import { frequencyToNoteName } from 'src/app/utils/pitch.utils';
 
 const workletChunkSize = 128;
 const bigWindow = 4096;
@@ -22,6 +23,9 @@ const useYin = false; // use MPM by default
  */
 function scaleArrayToMinusOneToOne(array: Float32Array) {
     const maxAbsValue = Math.max(...array.map(Math.abs));
+    if (maxAbsValue === 0) {
+        return array;
+    }
     return array.map((value) => value / maxAbsValue);
 }
 
@@ -33,7 +37,9 @@ function scaleArrayToMinusOneToOne(array: Float32Array) {
  */
 export class PitchService {
     private isStopped = false;
-    private accumNode!: AudioWorkletNode;
+    private isConnected = false;
+    private connectPromise: Promise<void> | null = null;
+    private accumNode: AudioWorkletNode | null = null;
     private analyser!: AnalyserNode;
     private wasmModule: any;
     private ptr: any;
@@ -47,6 +53,10 @@ export class PitchService {
      * Observable that emits the detected pitch.
      */
     pitch$ = new BehaviorSubject<number>(0);
+    /**
+     * Observable that emits the detected note name (e.g., C, D#, A).
+     */
+    note$ = new BehaviorSubject<string>('');
 
     /**
      * Connects to the audio input and initializes the pitch detection.
@@ -59,6 +69,26 @@ export class PitchService {
     ) { }
 
     async connect() {
+        if (this.isConnected) {
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            return;
+        }
+
+        if (this.connectPromise) {
+            return this.connectPromise;
+        }
+
+        this.connectPromise = this.initializeConnection();
+        try {
+            await this.connectPromise;
+        } finally {
+            this.connectPromise = null;
+        }
+    }
+
+    private async initializeConnection() {
         this.audioContext = new AudioContext();
         console.log("Sample rate:", this.audioContext.sampleRate);
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -86,31 +116,51 @@ export class PitchService {
 
         // Connect the microphone stream to the processor
         const source = this.audioContext.createMediaStreamSource(this.stream);
-        source.connect(this.accumNode);
+        if (this.accumNode) {
+            try {
+                source.connect(this.accumNode);
+            } catch (e) {
+                console.warn('Error connecting source to accumNode', e);
+            }
+        }
 
         this.analyser = this.audioContext.createAnalyser();
         this.analyser.fftSize = 2048;
 
-        this.accumNode.connect(this.analyser);
+        if (this.accumNode) {
+            try {
+                this.accumNode.connect(this.analyser);
+            } catch (e) {
+                console.warn('Error connecting accumNode to analyser', e);
+            }
+        }
 
         const gainNode = this.audioContext.createGain();
         gainNode.gain.value = 0.0;
         this.analyser.connect(gainNode);
 
         gainNode.connect(this.audioContext.destination);
-
-        this.accumNode.port.onmessage = (event) => {
+        
+        if (this.accumNode && this.accumNode.port) {
+            this.accumNode.port.onmessage = (event) => {
             // Check if the "stop" button has been clicked
             // event.data contains 128 samples of audio data from
             // the microphone through the AudioWorkletProcessor
 
             // scale event.data.data up to [-1, 1]
+            if (!this.wasmModule || !this.ptr || !this.ptrPitches) {
+                return;
+            }
+
             const scaledData = scaleArrayToMinusOneToOne(event.data.data);
 
             // Calculate the offset in bytes based on nAccumulated
             const offset = (this.nAccumulated * workletChunkSize) * Float32Array.BYTES_PER_ELEMENT;
 
             // store latest 128 samples into the WASM buffer
+            if (!this.wasmModule || !this.wasmModule.HEAPF32) {
+                return;
+            }
             this.wasmModule.HEAPF32.set(scaledData, (this.ptr + offset) / Float32Array.BYTES_PER_ELEMENT);
             this.nAccumulated += 1;
 
@@ -122,15 +172,34 @@ export class PitchService {
                 this.wasmModule._pitchlitePitches(this.ptr, this.ptrPitches);
 
                 // copy the results back into a JS array
+                if (!this.wasmModule || !this.wasmModule.HEAPF32) {
+                    return;
+                }
                 let wasmArrayPitches = new Float32Array(this.wasmModule.HEAPF32.buffer, this.ptrPitches, this.n_pitches);
                 // Do something with the pitch
-                this.pitch$.next(wasmArrayPitches[this.n_pitches - 1]);
+                const detected = wasmArrayPitches[this.n_pitches - 1];
+                // Safe handling of invalid values
+                if (!Number.isFinite(detected) || detected <= 0) {
+                    // console.log('[PitchService] detected invalid pitch:', detected);
+                    this.pitch$.next(0);
+                    this.note$.next('');
+                } else {
+                    this.pitch$.next(detected);
+                    const noteName = frequencyToNoteName(detected);
+                    this.note$.next(noteName);
+                    //console.log(`[PitchService] freq: ${detected.toFixed(2)} Hz -> note: ${noteName}`);
+                }
 
                 // clear the entire buffer
                 this.wasmModule._memset(this.ptr, 0, bigWindow * Float32Array.BYTES_PER_ELEMENT);
             }
-        };
+            };
+        }
+    
+
+        this.isConnected = true;
     }
+
     /**
      * Disconnects the audio input and cleans up resources.
      * @returns void
@@ -138,12 +207,29 @@ export class PitchService {
      * pitchService.disconnect();
      */
     disconnect() {
+        if (!this.isConnected && !this.audioContext && !this.stream && !this.wasmModule) {
+            return;
+        }
+
         console.log("Stopping and disconnecting and cleaning up");
         this.isStopped = true;
 
         if (this.accumNode) {
-            // disconnect the audio worklet node
-            this.accumNode.disconnect();
+            try {
+                if (this.accumNode.port) {
+                    try {
+                        // remove message handler to avoid callbacks after cleanup
+                        // @ts-ignore
+                        this.accumNode.port.onmessage = null;
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+                this.accumNode.disconnect();
+            } catch (e) {
+                console.warn('Error disconnecting accumNode', e);
+            }
+            this.accumNode = null;
         }
 
         if (this.stream) {
@@ -153,18 +239,24 @@ export class PitchService {
                 // Here you can free the allocated memory
                 track.stop();
             });
+            this.stream = undefined;
         }
 
         if (this.wasmModule) {
             // cleanup
             this.wasmModule._free(this.ptrPitches);
             this.wasmModule._free(this.ptr);
+            this.wasmModule = null;
         }
 
         if (this.audioContext) {
             this.audioContext.close();
             this.audioContext = null;
         }
+
+        this.nAccumulated = 0;
+        this.isConnected = false;
+        this.pitch$.next(0);
     }
 }
 

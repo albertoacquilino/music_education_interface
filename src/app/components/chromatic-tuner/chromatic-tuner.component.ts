@@ -7,13 +7,14 @@
  */
 
 import { ChangeDetectorRef, Component, Input, OnInit, OnDestroy } from '@angular/core';
-import { Observable, map, tap, Subject, bufferTime, Subscription, BehaviorSubject, bufferCount } from 'rxjs';
+import { Observable, map, tap, Subject, Subscription, bufferCount } from 'rxjs';
 import { PitchService } from 'src/app/services/pitch.service';
 import { IonicModule } from '@ionic/angular';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScrollImageComponent } from '../scroll-image-selector/scroll-image-selector.component';
 import { CommonModule } from '@angular/common';
 import { RefFreqService } from 'src/app/services/ref-freq.service';//to inject global service
+import { calculateDominantPitchMean } from 'src/app/utils/pitch.utils';
 const baseNotes: { [note: string]: { freq: number, key: number } } = {
     "A0": { "freq": 27.5, "key": 1 }, "A#0/Bb0": { "freq": 29.14, "key": 2 }, "B0": { "freq": 30.87, "key": 3 },
     "C1": { "freq": 32.7, "key": 4 }, "C#1/Db1": { "freq": 34.65, "key": 5 }, "D1": { "freq": 36.71, "key": 6 },
@@ -107,33 +108,7 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
     ) {
         this.pitch$ = this.pitchSubject.pipe(
             bufferCount(4),
-            map(pitches => {
-                if (pitches.length === 0) return 0;
-                const buckets = new Map<number, number[]>();
-                for (const pitch of pitches) {
-                    let bucketFound = false;
-                    for (const [key, bucket] of buckets.entries()) {
-                        if (Math.abs(pitch - key) <= 2) {
-                            bucket.push(pitch);
-                            bucketFound = true;
-                            break;
-                        }
-                    }
-                    if (!bucketFound) {
-                        buckets.set(pitch, [pitch]);
-                    }
-                }
-
-                let maxBucket: number[] = [];
-                for (const bucket of buckets.values()) {
-                    if (bucket.length > maxBucket.length) {
-                        maxBucket = bucket;
-                    }
-                }
-
-                const mean = maxBucket.reduce((a, b) => a + b, 0) / maxBucket.length;
-                return mean;
-            }),
+            map((pitches) => calculateDominantPitchMean(pitches)),
             tap(mean => {
                 if (mean > 0) {
                     if (this.meansArray.length === 0 || this.meansArray[this.meansArray.length - 1] !== mean) {
@@ -186,6 +161,11 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
      * Clean up subscriptions to prevent memory leaks.
      */
     ngOnDestroy() {
+        if (this.pitchSubscription) {
+            this.pitchSubscription.unsubscribe();
+            this.pitchSubscription = null;
+        }
+
         if (this.freqSubscription) {
             this.freqSubscription.unsubscribe();
         }
@@ -239,9 +219,21 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
      */
     start() {
         this.meansArray = [];  // Clear the array when starting
-        this.pitchService.connect();
-        this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
-            this.pitchSubject.next(pitch);
+
+        if (this.pitchSubscription) {
+            return;
+        }
+
+        this.pitchService.connect().then(() => {
+            if (this.pitchSubscription) {
+                return;
+            }
+
+            this.pitchSubscription = this.pitchService.pitch$.subscribe((pitch) => {
+                this.pitchSubject.next(pitch);
+            });
+        }).catch((error) => {
+            console.error('Unable to start pitch detection', error);
         });
     }
 
@@ -250,8 +242,6 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
      * @returns {number[]} The array of means calculated during the pitch detection.
      */
     stop(): number[] {
-        this.pitchService.disconnect();
-
         if (this.pitchSubscription) {
             this.pitchSubscription.unsubscribe();
             this.pitchSubscription = null;
