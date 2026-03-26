@@ -14,18 +14,32 @@
         </ion-button>
       </div>
 
-      <div class="session-grid">
-        <div class="metric-card">
-          <p class="metric-label">Score</p>
-          <p class="metric-value">{{ formatScore(currentSession.score) }}</p>
+      <ng-container *ngIf="hasData; else noData">
+        <div class="session-grid">
+          <div class="metric-card">
+            <p class="metric-label">Total notes</p>
+            <p class="metric-value">{{ formatScore(currentSession.totalNotes || 0) }}</p>
+          </div>
+          <div class="metric-card">
+            <p class="metric-label">Correct</p>
+            <p class="metric-value">{{ formatScore(currentSession.correctNotes || 0) }}</p>
+          </div>
+          <div class="metric-card">
+            <p class="metric-label">Incorrect</p>
+            <p class="metric-value">{{ formatScore(currentSession.incorrectNotes || 0) }}</p>
+          </div>
+          <div class="metric-card">
+            <p class="metric-label">Accuracy</p>
+            <p class="metric-value">{{ formatAccuracy(currentSession.accuracy) }}</p>
+          </div>
         </div>
-        <div class="metric-card">
-          <p class="metric-label">Accuracy</p>
-          <p class="metric-value">{{ formatAccuracy(currentSession.accuracy) }}</p>
-        </div>
-      </div>
+      </ng-container>
 
-      <ng-container *ngIf="hasPreviousSession; else firstSession">
+      <ng-template #noData>
+        <p class="no-data">No sound detected. Try playing a note to get feedback.</p>
+      </ng-template>
+
+      <ng-container *ngIf="hasPreviousSession && hasData; else changesBlock">
         <div class="changes-wrapper">
           <div class="change-row" [ngClass]="trendClass(scoreDiff)">
             <span>Score change</span>
@@ -38,8 +52,11 @@
         </div>
       </ng-container>
 
-      <ng-template #firstSession>
-        <p class="first-session">This is your first session 🎉</p>
+      <ng-template #changesBlock>
+        <ng-container *ngIf="!hasPreviousSession && hasData">
+          <p class="first-session">This is your first session 🎉</p>
+        </ng-container>
+        <!-- If previous session exists but no data, hide change rows -->
       </ng-template>
 
       <p class="feedback-text">{{ feedbackText }}</p>

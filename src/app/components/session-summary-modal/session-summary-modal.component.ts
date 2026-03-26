@@ -3,8 +3,11 @@ import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 
 export type SessionSummaryData = {
-  score: number;
+  score: number; // number of correct notes (kept for backward compatibility)
   accuracy: number;
+  totalNotes?: number;
+  correctNotes?: number;
+  incorrectNotes?: number;
 };
 
 @Component({
@@ -31,6 +34,10 @@ export class SessionSummaryModalComponent implements OnChanges {
     if (changes['currentSession'] || changes['previousSession'] || changes['isOpen']) {
       this.computeComparison();
     }
+  }
+
+  public get hasData(): boolean {
+    return this.toSafeNumber(this.currentSession?.totalNotes) > 0;
   }
 
   requestClose(): void {
@@ -112,7 +119,7 @@ export class SessionSummaryModalComponent implements OnChanges {
     this.feedbackText = 'Consistent performance!';
   }
 
-  private toSafeNumber(value: unknown): number {
+  public toSafeNumber(value: unknown): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }

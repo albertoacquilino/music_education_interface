@@ -29,7 +29,7 @@ import { RefFreqService } from 'src/app/services/ref-freq.service';
 import { SoundsService } from 'src/app/services/sounds.service';
 import { TabsService } from 'src/app/services/tabs.service';
 import { scoreFromNote } from 'src/app/utils/score.utils';
-import { calculateDominantPitchMean } from 'src/app/utils/pitch.utils';
+import { calculateDominantPitchMean, frequencyToNoteName, expectedLabelToNoteName } from 'src/app/utils/pitch.utils';
 import { DYNAMICS, INITIAL_NOTE, MAXCYCLES, MAXREFFREQUENCY, MAXTEMPO, MINREFFREQUENCY, MINTEMPO, TRUMPET_NOTES, CLARINET_NOTES, POSITIONS, TRUMPET_BTN, CLARINET_POSITIONS,OBOE_NOTES,OBOE_POSITIONS} from '../../constants';
 import { BeatService } from '../../services/beat.service';
 
@@ -194,6 +194,9 @@ export class HomePage implements OnInit, OnDestroy {
   private backgroundPitchSubscription: Subscription | null = null;
   private bufferedPitchSamples: number[] = [];
   private activeMeasureMeans: number[] = [];
+  private correctNotes: number = 0;
+  private incorrectNotes: number = 0;
+  private previousDetectedNote: string = '';
   private collectingMeasurePitch = false;
 
   /**
@@ -612,6 +615,8 @@ export class HomePage implements OnInit, OnDestroy {
     if (tempo.beat == 0) {
       if (tempo.measure == 0) {
         this.currentNote = this.nextNote();
+        // reset previous detected note so the new target can be counted
+        this.previousDetectedNote = '';
         this._sounds.currentNote = this.currentNote;
         this.updateScore(this.currentNote);
         if (this.selectedInstrument === "trumpet") {
@@ -697,6 +702,10 @@ export class HomePage implements OnInit, OnDestroy {
    */
   start() {
     this.collectedMeansObject = {};
+    // reset note counters for a fresh session
+    this.correctNotes = 0;
+    this.incorrectNotes = 0;
+    this.previousDetectedNote = '';
 
     // Initialize pitch detection for the exercise session and subscribe to pitch stream
     this.pitchService.connect().then(() => {
@@ -717,6 +726,28 @@ export class HomePage implements OnInit, OnDestroy {
 
           if (bufferedMean <= 0) {
             return;
+          }
+
+          // Convert mean frequency to a note name and compare with expected note(s)
+          const detectedNote = frequencyToNoteName(bufferedMean);
+          if (!detectedNote) {
+            // ignore frames where no pitch is detected
+            return;
+          }
+
+          const expectedLabels = this.NOTES[this.currentNote];
+          const expectedNames = expectedLabels.map(l => expectedLabelToNoteName(l));
+          const match = expectedNames.includes(detectedNote);
+
+          // Skip duplicate detections to avoid counting the same sustained note multiple times
+          if (detectedNote !== this.previousDetectedNote) {
+            if (match) this.correctNotes++;
+            else this.incorrectNotes++;
+            this.previousDetectedNote = detectedNote;
+            // console.log(`Detected: ${detectedNote}, Expected: ${expectedNames.join('/')}, Match: ${match}`);
+          } else {
+            // duplicate frame for same detected note — ignore for scoring
+            // console.log(`Ignored duplicate detected note: ${detectedNote}`);
           }
 
           if (this.activeMeasureMeans.length === 0 || this.activeMeasureMeans[this.activeMeasureMeans.length - 1] !== bufferedMean) {
@@ -784,36 +815,20 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   private buildCurrentSessionSummary(): SessionSummaryData {
-    const allMeans = Object.keys(this.collectedMeansObject).reduce((acc: number[], key: string) => {
-      const values = this.collectedMeansObject[key];
-      if (!Array.isArray(values)) {
-        return acc;
-      }
-
-      return acc.concat(values);
-    }, []);
-
-    const validPitches = allMeans.filter((pitch) => Number.isFinite(pitch) && pitch > 0);
-    if (validPitches.length === 0) {
-      return { score: 0, accuracy: 0 };
+    // Build session summary based solely on note equality counts
+    const totalNotes = this.correctNotes + this.incorrectNotes;
+    if (totalNotes === 0) {
+      return { score: 0, accuracy: 0, totalNotes: 0, correctNotes: 0, incorrectNotes: 0 };
     }
 
-    const referenceA4 = Number.isFinite(this.refFrequencyValue$) && this.refFrequencyValue$ > 0
-      ? this.refFrequencyValue$
-      : 440;
-
-    const inTuneCount = validPitches.reduce((count: number, pitch: number) => {
-      const semitoneOffset = Math.round(12 * Math.log2(pitch / referenceA4));
-      const nearestFrequency = referenceA4 * Math.pow(2, semitoneOffset / 12);
-      const centsDifference = 1200 * Math.log2(pitch / nearestFrequency);
-      return Math.abs(centsDifference) <= 10 ? count + 1 : count;
-    }, 0);
-
-    const accuracy = Number(((inTuneCount / validPitches.length) * 100).toFixed(1));
+    const accuracy = Number(((this.correctNotes / totalNotes) * 100).toFixed(1));
 
     return {
-      score: inTuneCount,
+      score: this.correctNotes,
       accuracy,
+      totalNotes,
+      correctNotes: this.correctNotes,
+      incorrectNotes: this.incorrectNotes,
     };
   }
 
@@ -827,6 +842,9 @@ export class HomePage implements OnInit, OnDestroy {
       const parsed = JSON.parse(raw);
       const score = Number(parsed?.score);
       const accuracy = Number(parsed?.accuracy);
+      const totalNotes = Number(parsed?.totalNotes);
+      const correctNotes = Number(parsed?.correctNotes);
+      const incorrectNotes = Number(parsed?.incorrectNotes);
 
       if (!Number.isFinite(score) || !Number.isFinite(accuracy)) {
         return null;
@@ -835,6 +853,9 @@ export class HomePage implements OnInit, OnDestroy {
       return {
         score,
         accuracy,
+        totalNotes: Number.isFinite(totalNotes) ? totalNotes : 0,
+        correctNotes: Number.isFinite(correctNotes) ? correctNotes : 0,
+        incorrectNotes: Number.isFinite(incorrectNotes) ? incorrectNotes : 0,
       };
     } catch (_error) {
       return null;
@@ -844,10 +865,16 @@ export class HomePage implements OnInit, OnDestroy {
   private saveLastSession(session: SessionSummaryData) {
     const score = Number(session?.score);
     const accuracy = Number(session?.accuracy);
+    const totalNotes = Number(session?.totalNotes);
+    const correctNotes = Number(session?.correctNotes);
+    const incorrectNotes = Number(session?.incorrectNotes);
 
     const safeSession: SessionSummaryData = {
       score: Number.isFinite(score) ? score : 0,
       accuracy: Number.isFinite(accuracy) ? Number(accuracy.toFixed(1)) : 0,
+      totalNotes: Number.isFinite(totalNotes) ? totalNotes : 0,
+      correctNotes: Number.isFinite(correctNotes) ? correctNotes : 0,
+      incorrectNotes: Number.isFinite(incorrectNotes) ? incorrectNotes : 0,
     };
 
     localStorage.setItem(this.lastSessionStorageKey, JSON.stringify(safeSession));

@@ -8,6 +8,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import * as pitchlite from 'src/app/services/pitchlite';
+import { frequencyToNoteName } from 'src/app/utils/pitch.utils';
 
 const workletChunkSize = 128;
 const bigWindow = 4096;
@@ -52,6 +53,10 @@ export class PitchService {
      * Observable that emits the detected pitch.
      */
     pitch$ = new BehaviorSubject<number>(0);
+    /**
+     * Observable that emits the detected note name (e.g., C, D#, A).
+     */
+    note$ = new BehaviorSubject<string>('');
 
     /**
      * Connects to the audio input and initializes the pitch detection.
@@ -172,7 +177,18 @@ export class PitchService {
                 }
                 let wasmArrayPitches = new Float32Array(this.wasmModule.HEAPF32.buffer, this.ptrPitches, this.n_pitches);
                 // Do something with the pitch
-                this.pitch$.next(wasmArrayPitches[this.n_pitches - 1]);
+                const detected = wasmArrayPitches[this.n_pitches - 1];
+                // Safe handling of invalid values
+                if (!Number.isFinite(detected) || detected <= 0) {
+                    // console.log('[PitchService] detected invalid pitch:', detected);
+                    this.pitch$.next(0);
+                    this.note$.next('');
+                } else {
+                    this.pitch$.next(detected);
+                    const noteName = frequencyToNoteName(detected);
+                    this.note$.next(noteName);
+                    //console.log(`[PitchService] freq: ${detected.toFixed(2)} Hz -> note: ${noteName}`);
+                }
 
                 // clear the entire buffer
                 this.wasmModule._memset(this.ptr, 0, bigWindow * Float32Array.BYTES_PER_ELEMENT);
