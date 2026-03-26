@@ -1,0 +1,61 @@
+/*
+ * This file is part of the Music Education Interface project.
+ * Copyright (C) 2025 Alberto Acquilino
+ *
+ * Licensed under the GNU Affero General Public License v3.0.
+ * See the LICENSE file for more details.
+ */
+
+/*
+ * Responsive Breakpoints System
+ * Mobile-first approach with consistent breakpoint definitions
+ */
+
+$breakpoint-xs: 320px;   // Small phones (iPhone SE)
+$breakpoint-sm: 480px;   // Standard phones (iPhone)
+$breakpoint-md: 768px;   // Tablets/landscape phones (iPad Mini)
+$breakpoint-lg: 1024px;  // Large tablets (iPad)
+$breakpoint-xl: 1440px;  // Desktop monitors
+
+// Mixins for responsive design
+@mixin respond-to-sm {
+  @media (min-width: $breakpoint-sm) {
+    @content;
+  }
+}
+
+@mixin respond-to-md {
+  @media (min-width: $breakpoint-md) {
+    @content;
+  }
+}
+
+@mixin respond-to-lg {
+  @media (min-width: $breakpoint-lg) {
+    @content;
+  }
+}
+
+@mixin respond-to-xl {
+  @media (min-width: $breakpoint-xl) {
+    @content;
+  }
+}
+
+@mixin landscape {
+  @media (orientation: landscape) {
+    @content;
+  }
+}
+
+@mixin portrait {
+  @media (orientation: portrait) {
+    @content;
+  }
+}
+
+@mixin high-dpi {
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    @content;
+  }
+}
