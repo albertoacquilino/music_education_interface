@@ -338,6 +338,15 @@ ion-segment-button {
 }
 
 @media screen and (orientation: landscape) and (pointer: coarse) {
+  .wrapper.is-idle {
+    grid-template-rows: auto;
+    align-content: start;
+  }
+
+  .wrapper.is-idle .top-middle-container {
+    display: none;
+  }
+
   .wrapper.is-playing {
     width: min(100%, 1280px);
   }
