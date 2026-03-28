@@ -130,9 +130,14 @@ export class BeatService {
 
     this._playing = false;
 
-    if (!this._interval) return;
+    if (this._interval) {
+      this._interval.unsubscribe();
+    }
 
-    this._interval.unsubscribe();
+    this._beat = -1;
+    this._measure = -1;
+    this._cycle = -1;
+
     this.tick$.emit(({
       playing: false,
       measure: this._measure,
