@@ -632,11 +632,13 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
         case 0:
           this.currentAction = "Rest";
           if (this.mode == 'tuner') {
-            const meansArray = this.chromaticTuner.stop();
-            this.collectedMeansObject = {
-              ...this.collectedMeansObject,
-              [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-            };
+            const meansArray = this.chromaticTuner.stopCapture();
+            if (meansArray.length > 0) {
+              this.collectedMeansObject = {
+                ...this.collectedMeansObject,
+                [Object.keys(this.collectedMeansObject).length + 1]: meansArray
+              };
+            }
           }
           break;
         case 1:
@@ -645,7 +647,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
         case 2:
           this.currentAction = "Play";
           if (this.mode == 'tuner') {
-            this.chromaticTuner.start();
+            this.chromaticTuner.startCapture();
           }
           break;
       }
@@ -676,6 +678,9 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     } else {
       await this.soundsService.unlockAudio();
       await this.soundsService.ensureSoundsReady();
+      if (this.mode === 'tuner') {
+        await this.chromaticTuner.prepare();
+      }
       this.start();
       this.tabsService.setDisabled(true);
     }
@@ -707,10 +712,12 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     this._tempo.stop();
     if (this.mode == 'tuner') {
       const meansArray = this.chromaticTuner.stop();
-      this.collectedMeansObject = {
-        ...this.collectedMeansObject,
-        [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-      };
+      if (meansArray.length > 0) {
+        this.collectedMeansObject = {
+          ...this.collectedMeansObject,
+          [Object.keys(this.collectedMeansObject).length + 1]: meansArray
+        };
+      }
       console.log('Collected Means', this.collectedMeansObject);
     }
     else if (this.mode == this.selectedInstrument) {
