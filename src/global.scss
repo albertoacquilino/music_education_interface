@@ -425,6 +425,11 @@ body.dark-theme {
     color: #fead26 !important;
   }
 
+  .sounds-loading-hint {
+    background: rgba(98, 160, 255, 0.18);
+    color: #ffffff;
+  }
+
   //OVERRIDE: Main Score Area (Background Black, VexFlow Notes White)
   score-view div#score {
     background-color: #000000 !important;

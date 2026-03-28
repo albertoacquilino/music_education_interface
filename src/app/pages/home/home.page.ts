@@ -114,6 +114,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * The observable for the tempo.
    */
   tempo$ = this._tempo.tempo$;
+  soundsLoading$ = this.soundsService.loading$;
 
   /**
    * The high note.
@@ -418,6 +419,10 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * @returns void
    */
   async checkMuted() {
+    if (Capacitor.getPlatform() === 'android') {
+      return;
+    }
+
     try {
       const muted = await Mute.isMuted();
 
@@ -426,8 +431,8 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       }
       this.muteAlert = true;
       const alert = await this.alertController.create({
-        header: 'Mute Alert',
-        message: 'Your device is currently muted. Please unmute to hear the trumpet sounds.',
+        header: 'Sound Check',
+        message: 'Make sure your sound is on to hear the instrument sounds.',
         buttons: ['OK'],
       });
       alert.present();
@@ -670,9 +675,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       this.tabsService.setDisabled(false);
     } else {
       await this.soundsService.unlockAudio();
-      if (this.mode === this.selectedInstrument) {
-        await this.soundsService.ensureSoundsReady();
-      }
+      await this.soundsService.ensureSoundsReady();
       this.start();
       this.tabsService.setDisabled(true);
     }

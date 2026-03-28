@@ -7,6 +7,7 @@
  */
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { Howler } from 'howler';
 import * as pitchlite from 'src/app/services/pitchlite';
 
 const workletChunkSize = 128;
@@ -45,6 +46,7 @@ export class PitchService {
     private n_pitches!: number;
     private audioContext: AudioContext | null = null;
     private connectPromise: Promise<void> | null = null;
+    private usingSharedAudioContext = false;
 
     /**
      * Observable that emits the detected pitch.
@@ -61,6 +63,22 @@ export class PitchService {
 
     ) { }
 
+    private async ensureAudioContext(): Promise<AudioContext> {
+        if (Howler.usingWebAudio && Howler.ctx) {
+            this.audioContext = Howler.ctx as AudioContext;
+            this.usingSharedAudioContext = true;
+        } else if (!this.audioContext || this.audioContext.state === 'closed') {
+            this.audioContext = new AudioContext();
+            this.usingSharedAudioContext = false;
+        }
+
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+
+        return this.audioContext;
+    }
+
     async primeMicrophoneAccess() {
         if (!navigator.mediaDevices?.getUserMedia) {
             throw new Error('Microphone access is not available in this browser.');
@@ -71,13 +89,7 @@ export class PitchService {
                 return;
             }
 
-            if (!this.audioContext || this.audioContext.state === 'closed') {
-                this.audioContext = new AudioContext();
-            }
-
-            if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
-            }
+            await this.ensureAudioContext();
 
             this.primedStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         } catch (error) {
@@ -105,16 +117,9 @@ export class PitchService {
     private async initializeConnection() {
         this.isStopped = false;
         this.nAccumulated = 0;
+        const audioContext = await this.ensureAudioContext();
 
-        if (!this.audioContext || this.audioContext.state === 'closed') {
-            this.audioContext = new AudioContext();
-        }
-
-        if (this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
-        }
-
-        console.log("Sample rate:", this.audioContext.sampleRate);
+        console.log("Sample rate:", audioContext.sampleRate);
 
         this.stream = this.primedStream?.active
             ? this.primedStream
@@ -126,7 +131,7 @@ export class PitchService {
         this.n_pitches = this.wasmModule._pitchliteInit(
             bigWindow,
             smallWindow,
-            this.audioContext.sampleRate,
+            audioContext.sampleRate,
             useYin,
             minPitch,
         );
@@ -134,26 +139,26 @@ export class PitchService {
         this.ptr = this.wasmModule._malloc(bigWindow * Float32Array.BYTES_PER_ELEMENT);
         this.ptrPitches = this.wasmModule._malloc(this.n_pitches * Float32Array.BYTES_PER_ELEMENT);
 
-        await this.audioContext.audioWorklet.addModule('assets/audio-accumulator.js');
+        await audioContext.audioWorklet.addModule('assets/audio-accumulator.js');
 
-        this.accumNode = new AudioWorkletNode(this.audioContext, 'audio-accumulator', {
+        this.accumNode = new AudioWorkletNode(audioContext, 'audio-accumulator', {
             numberOfInputs: 1,
             numberOfOutputs: 1,
             outputChannelCount: [2],
         });
 
-        this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+        this.sourceNode = audioContext.createMediaStreamSource(this.stream);
         this.sourceNode.connect(this.accumNode);
 
-        this.analyser = this.audioContext.createAnalyser();
+        this.analyser = audioContext.createAnalyser();
         this.analyser.fftSize = 2048;
 
         this.accumNode.connect(this.analyser);
 
-        const gainNode = this.audioContext.createGain();
+        const gainNode = audioContext.createGain();
         gainNode.gain.value = 0.0;
         this.analyser.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
+        gainNode.connect(audioContext.destination);
 
         this.accumNode.port.onmessage = (event) => {
             const scaledData = scaleArrayToMinusOneToOne(event.data.data);
@@ -207,11 +212,16 @@ export class PitchService {
             this.wasmModule._free(this.ptr);
         }
 
-        if (this.audioContext) {
+        if (this.audioContext && !this.usingSharedAudioContext) {
             this.audioContext.close();
             this.audioContext = null;
         }
 
+        if (this.usingSharedAudioContext) {
+            this.audioContext = null;
+        }
+
+        this.usingSharedAudioContext = false;
         this.stream = undefined;
         this.ptr = null;
         this.ptrPitches = null;

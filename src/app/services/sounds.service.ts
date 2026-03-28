@@ -10,6 +10,7 @@ import { Injectable } from "@angular/core";
 import { BeatService } from "./beat.service";
 import { AppBeat } from '../models/appbeat.types';
 import { Howl, Howler } from "howler";
+import { BehaviorSubject } from "rxjs";
 import { TRUMPET_NOTES, CLARINET_NOTES,OBOE_NOTES} from "../constants";
 
 // Predefined beat sounds
@@ -50,8 +51,10 @@ export class SoundsService {
     private preloadVersion = 0; // Guards against overlapping async preload calls
     private preloadTask: Promise<void> = Promise.resolve();
     private audioUnlocked = false;
+    private loadingSubject = new BehaviorSubject<boolean>(true);
     currentNote: number = 0; // Index of the current note
     volume: number = 1.0; // Volume level for sound playback
+    loading$ = this.loadingSubject.asObservable();
 
     /**
      * Creates an instance of SoundsService.
@@ -94,6 +97,7 @@ export class SoundsService {
     private async preloadSounds() {
         const preloadVersion = ++this.preloadVersion;
         const instrument = this.selectedInstrument;
+        this.loadingSubject.next(true);
         let notesToLoad;
 
         if (instrument === 'trumpet') {
@@ -104,27 +108,36 @@ export class SoundsService {
             notesToLoad = OBOE_NOTES;
         } else {
             console.warn('Unknown instrument:', instrument);
+            if (preloadVersion === this.preloadVersion) {
+                this.loadingSubject.next(false);
+            }
             return;
         }
 
-        for (const sound of BEAT_SOUNDS) {
-            sound.load();
+        try {
+            for (const sound of BEAT_SOUNDS) {
+                sound.load();
+            }
+
+            // Build note sounds off to the side so overlapping async preloads cannot
+            // scramble the index-to-note mapping used during playback.
+            const loadedNotes = await Promise.all(
+                notesToLoad.map(async (noteVariants) => {
+                    const filePath = await this.resolveAudioPath(instrument, noteVariants);
+                    return this.createLoadedHowl(filePath);
+                })
+            );
+
+            if (preloadVersion !== this.preloadVersion || instrument !== this.selectedInstrument) {
+                return;
+            }
+
+            this.preloadedNotes = loadedNotes;
+        } finally {
+            if (preloadVersion === this.preloadVersion && instrument === this.selectedInstrument) {
+                this.loadingSubject.next(false);
+            }
         }
-
-        // Build note sounds off to the side so overlapping async preloads cannot
-        // scramble the index-to-note mapping used during playback.
-        const loadedNotes = await Promise.all(
-            notesToLoad.map(async (noteVariants) => {
-                const filePath = await this.resolveAudioPath(instrument, noteVariants);
-                return this.createLoadedHowl(filePath);
-            })
-        );
-
-        if (preloadVersion !== this.preloadVersion || instrument !== this.selectedInstrument) {
-            return;
-        }
-
-        this.preloadedNotes = loadedNotes;
     }
 
     private createLoadedHowl(filePath: string): Promise<Howl> {
