@@ -84,6 +84,11 @@
 
           </div>
 
+          <div class="sounds-loading-hint" *ngIf="soundsLoading$ | async">
+            <ion-spinner name="crescent"></ion-spinner>
+            <span>Loading sounds, please wait before starting the exercise.</span>
+          </div>
+
           <div class="ios-audio-hint" *ngIf="showIOSWebAudioHint">
             <span>On iPhone/iPad browsers, audio may be muted when the side switch is set to Silent.</span>
             <button type="button" class="ios-audio-hint-dismiss" (click)="dismissIOSWebAudioHint()">Dismiss</button>
@@ -95,8 +100,8 @@
   </ion-content>
 
   <ion-footer>
-    <ion-button (click)="startStop()" expand="block">
-      {{isPlaying() ? 'Stop':'Start'}}
+    <ion-button (click)="startStop()" expand="block" [disabled]="(soundsLoading$ | async) && !isPlaying()">
+      {{isPlaying() ? 'Stop': ((soundsLoading$ | async) ? 'Loading sounds...' : 'Start')}}
     </ion-button>
   </ion-footer>
 
