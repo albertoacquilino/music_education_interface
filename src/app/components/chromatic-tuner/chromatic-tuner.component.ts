@@ -99,6 +99,8 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
 
     meansArray: number[] = [];  // Array to store the means
     private freqSubscription!: Subscription;//to track Service
+    private listening = false;
+    private collecting = false;
 
     constructor(
         private pitchService: PitchService,
@@ -189,6 +191,8 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
         if (this.freqSubscription) {
             this.freqSubscription.unsubscribe();
         }
+
+        this.shutdown();
     }
 
     /**
@@ -233,23 +237,53 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
         this.currentEmoji = 'notHappy';
     }
     }
-    /**
-     * Starts the pitch detection process.
-     * Clears the means array and subscribes to the pitch service.
-     */
-    async start() {
-        this.meansArray = [];  // Clear the array when starting
-        await this.pitchService.connect();
-        this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
-            this.pitchSubject.next(pitch);
-        });
+
+    private resetDisplay() {
+        this.showEmoji(0);
+        this.rotatePointer(0);
+        this.currentNote = '';
+        this.currentCents = 0;
+        this.detectedPitch = 0;
+        this.changeDetectorRef.detectChanges();
     }
 
-    /**
-     * Stops the pitch detection process and returns the array of means.
-     * @returns {number[]} The array of means calculated during the pitch detection.
-     */
-    stop(): number[] {
+    private async ensureListening() {
+        if (this.listening) {
+            return;
+        }
+
+        await this.pitchService.connect();
+        this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
+            if (!this.collecting) {
+                return;
+            }
+
+            this.pitchSubject.next(pitch);
+        });
+        this.listening = true;
+    }
+
+    async prepare() {
+        await this.ensureListening();
+        this.resetDisplay();
+    }
+
+    startCapture() {
+        this.meansArray = [];
+        this.collecting = true;
+        this.changeDetectorRef.detectChanges();
+    }
+
+    stopCapture(): number[] {
+        this.collecting = false;
+        const capturedMeans = [...this.meansArray];
+        this.resetDisplay();
+        return capturedMeans;
+    }
+
+    shutdown(): number[] {
+        const capturedMeans = this.stopCapture();
+
         this.pitchService.disconnect();
 
         if (this.pitchSubscription) {
@@ -257,14 +291,27 @@ export class ChromaticTunerComponent implements OnInit, OnDestroy {
             this.pitchSubscription = null;
         }
 
-        this.showEmoji(0);
-        this.rotatePointer(0);
-        this.currentNote = '';
-        this.detectedPitch = 0;
-        this.changeDetectorRef.detectChanges();
+        this.listening = false;
+        return capturedMeans;
+    }
 
-        console.log(this.meansArray);
-        return this.meansArray;  // Return the array of means
+    /**
+     * Starts the pitch detection process.
+     * Clears the means array and subscribes to the pitch service.
+     */
+    async start() {
+        await this.prepare();
+        this.startCapture();
+    }
+
+    /**
+     * Stops the pitch detection process and returns the array of means.
+     * @returns {number[]} The array of means calculated during the pitch detection.
+     */
+    stop(): number[] {
+        const means = this.shutdown();
+        console.log(means);
+        return means;  // Return the array of means
     }
 
     /**
