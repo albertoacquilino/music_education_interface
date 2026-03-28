@@ -280,6 +280,8 @@ body,
 
 #main-content ion-content {
   --overflow: hidden;
+  --background: #ffffff;
+  background: #ffffff;
 }
 
 #main-content .top-middle-container,
@@ -293,6 +295,7 @@ body,
   min-height: 100%;
   position: relative !important;
   overflow: hidden;
+  background-color: #ffffff;
 }
 
 #main-content .wrapper {
@@ -368,6 +371,11 @@ body.dark-theme {
   &, .ion-app, .ion-page, #container, .wrapper, ion-modal {
     background-color: #000000 !important;
     color: #ffffff !important;
+  }
+  
+  ion-content {
+    --background: #000000 !important;
+    background: #000000 !important;
   }
 
   .top, .middle, .controls {

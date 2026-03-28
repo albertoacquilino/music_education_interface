@@ -83,6 +83,8 @@ ion-modal {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: clamp(10px, 1.6vh, 18px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .wrapper.is-playing .top-middle-container {
