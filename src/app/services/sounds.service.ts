@@ -15,10 +15,10 @@ import { TRUMPET_NOTES, CLARINET_NOTES,OBOE_NOTES} from "../constants";
 
 // Predefined beat sounds
 export const BEAT_SOUNDS = [
-    new Howl({ src: ['assets/sounds/tick_strong.wav'] }),
-    new Howl({ src: ['assets/sounds/tick_weak.wav'] }),
-    new Howl({ src: ['assets/sounds/tick_weak.wav'] }),
-    new Howl({ src: ['assets/sounds/tick_weak.wav'] })
+    new Howl({ src: ['assets/sounds/tick_strong.m4a'] }),
+    new Howl({ src: ['assets/sounds/tick_weak.m4a'] }),
+    new Howl({ src: ['assets/sounds/tick_weak.m4a'] }),
+    new Howl({ src: ['assets/sounds/tick_weak.m4a'] })
 ]
 
 /**
@@ -90,7 +90,7 @@ export class SoundsService {
     //         const note = notesToLoad[i];
     //         const soundFile = note[0];
 
-    //         const audio = new Howl({ src: [`assets/sounds/${this.selectedInstrument}_note_sounds/${soundFile}.wav`] });
+    //         const audio = new Howl({ src: [`assets/sounds/${this.selectedInstrument}_note_sounds/${soundFile}.m4a`] });
     //         this.preloadedNotes.push(audio); // Store preloaded note sounds
     //     }
     // }
@@ -186,8 +186,7 @@ private async resolveAudioPath(instrument: string, noteVariants: string[]): Prom
     const candidates: string[] = [];
 
     for (const noteName of noteVariants) {
-        candidates.push(`assets/sounds/${instrument}_note_sounds/${noteName}.wav`);
-        candidates.push(`assets/sounds/${instrument}_note_sounds/${noteName}.mp3`);
+        candidates.push(`assets/sounds/${instrument}_note_sounds/${noteName}.m4a`);
     }
 
     for (const candidate of candidates) {

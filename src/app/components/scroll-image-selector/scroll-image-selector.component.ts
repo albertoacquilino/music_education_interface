@@ -13,7 +13,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { CommonModule } from '@angular/common';
 import { Howl } from 'howler';
 
-const TICK_SOUND = new Howl({ src: ['assets/sounds/tick_weak.wav'] });
+const TICK_SOUND = new Howl({ src: ['assets/sounds/tick_weak.m4a'] });
 
 /**
  * ScrollImageComponent is a component that allows users to scroll through a list of images.
