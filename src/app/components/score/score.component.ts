@@ -27,8 +27,8 @@ import { RenderContext, Renderer } from 'vexflow';
   selector: 'score-view',
   template: `
     <div id="score" class="score-surface"></div>
-    <div *ngIf="noteNames.length > 0" class="score-note-name">
-      <strong>{{ noteNames[1] }}</strong> 
+    <div *ngIf="displayNoteName" class="score-note-name">
+      <strong>{{ displayNoteName }}</strong>
     </div>
   `,
   styles: [`
@@ -50,12 +50,14 @@ import { RenderContext, Renderer } from 'vexflow';
 
     .score-note-name {
       flex: 0 0 auto;
-      min-height: 2rem;
-      margin-top: 0.15rem;
-      padding: 0 0 0.25rem;
+      min-height: 2.35rem;
+      margin-top: 0.25rem;
+      padding: 0 0 0.45rem;
       text-align: center;
-      font-size: clamp(1.15rem, 2.2vw, 1.6rem);
+      color: #111111;
+      font-size: clamp(1.3rem, 2.6vw, 1.8rem);
       line-height: 1.1;
+      letter-spacing: 0.02em;
     }
   `],
   standalone: true,
@@ -82,8 +84,7 @@ export class ScoreViewComponent implements AfterViewInit {
   @Input() language: string = 'en';
   private _renderer!: Renderer;
   private _context!: RenderContext;
-  // New property to hold note names
-  noteNames: string[] = [];
+  displayNoteName = '';
   /**
    * Constructor for the ScoreViewComponent.
    * 
@@ -171,9 +172,9 @@ export class ScoreViewComponent implements AfterViewInit {
     }
     this._context.clear();
     const measureWidth = (this.size$.value.width - 20) / score.measures.length;
+    this.displayNoteName = this.getDisplayNoteName(score);
 
     let staveMeasure = null;
-    this.noteNames = []; // Reset note names for the new score
 
     for (const [index, measure] of score.measures.entries()) {
       if (staveMeasure === null) {
@@ -210,86 +211,6 @@ export class ScoreViewComponent implements AfterViewInit {
         .draw();
 
       const notesMeasure = measure.map((measure) => generateNotes(measure.notes, measure.duration));
-
-      notesMeasure.forEach((note) => {
-        let noteName = note.keys[0]; // Get the note name
-         // Extract only the note part (before the '/')
-        const extractedNoteName = noteName.split('/')[0]; // Get the note name without octave
-        //  this.noteNames.push(extractedNoteName); 
-        // Language-based note name conversion
-        if (this.language === 'it') {
-          switch (extractedNoteName) {
-            case 'C':
-              this.noteNames.push('Do');
-              break;
-            case 'D':
-              this.noteNames.push('Re');
-              break;
-            case 'E':
-              this.noteNames.push('Mi');
-              break;
-            case 'F':
-              this.noteNames.push('Fa');
-              break;
-            case 'G':
-              this.noteNames.push('Sol');
-              break;
-            case 'A':
-              this.noteNames.push('La');
-              break;
-            case 'B':
-              this.noteNames.push('Si');
-              break;
-              case 'Cb':
-              this.noteNames.push('Do b');
-              break;
-            case 'Db':
-              this.noteNames.push('Re b');
-              break;
-            case 'Eb':
-              this.noteNames.push('Mi b');
-              break;
-            case 'Fb':
-              this.noteNames.push('Fa b');
-              break;
-            case 'Gb':
-              this.noteNames.push('Sol b');
-              break;
-            case 'Ab':
-              this.noteNames.push('La b');
-              break;
-            case 'Bb':
-              this.noteNames.push('Si b');
-              break;
-              case 'C#':
-              this.noteNames.push('Do #');
-              break;
-            case 'D#':
-              this.noteNames.push('Re #');
-              break;
-            case 'E#':
-              this.noteNames.push('Mi #');
-              break;
-            case 'F#':
-              this.noteNames.push('Fa #');
-              break;
-            case 'G#':
-              this.noteNames.push('Sol #');
-              break;
-            case 'A#':
-              this.noteNames.push('La #');
-              break;
-            case 'B#':
-              this.noteNames.push('Si #');
-              break;
-            default:
-              this.noteNames.push(extractedNoteName); // Fallback to original name
-          }
-        } else {
-          // Default to English note names
-          this.noteNames.push(extractedNoteName);
-        }
-      }); 
       Flow.Formatter.FormatAndDraw(this._context, staveMeasure, notesMeasure);
     }
 
@@ -328,5 +249,87 @@ const observer = new MutationObserver((mutations, obs) => {
 observer.observe(div, { childList: true, subtree: true });
 
 
+  }
+
+  private getDisplayNoteName(score: Score): string {
+    let noteToken = '';
+
+    for (const measureGroup of score.measures) {
+      for (const measure of measureGroup) {
+        if (measure.duration.includes('r')) {
+          continue;
+        }
+
+        const note = measure.notes[0];
+        if (note && !note.endsWith('r')) {
+          noteToken = note;
+          break;
+        }
+      }
+
+      if (noteToken) {
+        break;
+      }
+    }
+
+    if (!noteToken) {
+      return '';
+    }
+
+    const rawName = noteToken.split('/')[0].toUpperCase();
+    return this.formatNoteName(rawName);
+  }
+
+  private formatNoteName(noteName: string): string {
+    if (this.language !== 'it') {
+      return noteName;
+    }
+
+    switch (noteName) {
+      case 'C':
+        return 'Do';
+      case 'D':
+        return 'Re';
+      case 'E':
+        return 'Mi';
+      case 'F':
+        return 'Fa';
+      case 'G':
+        return 'Sol';
+      case 'A':
+        return 'La';
+      case 'B':
+        return 'Si';
+      case 'CB':
+        return 'Do b';
+      case 'DB':
+        return 'Re b';
+      case 'EB':
+        return 'Mi b';
+      case 'FB':
+        return 'Fa b';
+      case 'GB':
+        return 'Sol b';
+      case 'AB':
+        return 'La b';
+      case 'BB':
+        return 'Si b';
+      case 'C#':
+        return 'Do #';
+      case 'D#':
+        return 'Re #';
+      case 'E#':
+        return 'Mi #';
+      case 'F#':
+        return 'Fa #';
+      case 'G#':
+        return 'Sol #';
+      case 'A#':
+        return 'La #';
+      case 'B#':
+        return 'Si #';
+      default:
+        return noteName;
+    }
   }
 }
