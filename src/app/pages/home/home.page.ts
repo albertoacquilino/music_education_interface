@@ -362,7 +362,9 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * @returns void
    */
   ionViewWillLeave(): void {
+    this.currentAction = '';
     this._tempo.stop();
+    this.tabsService.setDisabled(false);
     if (this.mode == "tuner") this.chromaticTuner.stop();
   }
 
@@ -701,6 +703,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * @returns void
    */
   stop() {
+    this.currentAction = '';
     this._tempo.stop();
     if (this.mode == 'tuner') {
       const meansArray = this.chromaticTuner.stop();
@@ -714,6 +717,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       // this.pitchService.disconnect();
     }
     Howler.stop();
+    this.tabsService.setDisabled(false);
     this.firebase.saveStop('interrupted', this.collectedMeansObject);
   }
 
