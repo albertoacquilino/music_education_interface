@@ -25,6 +25,9 @@
               <ng-container *ngIf="selectedInstrument === 'oboe'">
                 <img [src]="oboePosition" alt="Oboe Position" />
               </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'tuner'">
+                <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+              </ng-container>
             </div>
             <div class="idle-instrument-label" *ngIf="selectedInstrument">
               <span>{{ selectedInstrumentDisplayName }}</span>
@@ -64,10 +67,15 @@
                   <img [src]="oboePosition" alt="Oboe Position" />
                 </div>
               </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'tuner'">
+                <div class="chromatic-tuner visual-panel">
+                  <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+                </div>
+              </ng-container>
             </div>
 
             <div class="stage-notation" aria-label="Score">
-              <div class="pitch-feedback" *ngIf="mode !== 'tuner' && isPlaying()" [ngClass]="pitchAccuracyClass">
+              <div class="pitch-feedback" *ngIf="selectedInstrument !== 'tuner' && isPlaying()" [ngClass]="pitchAccuracyClass">
                 <div class="pitch-feedback-label">{{ pitchFeedbackLabel }}</div>
                 <div class="pitch-bar" aria-hidden="true">
                   <div class="pitch-marker" [style.left.%]="pitchBarPosition"></div>

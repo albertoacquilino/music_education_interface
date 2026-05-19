@@ -53,31 +53,11 @@
                 <ion-select-option value="trumpet">Trumpet</ion-select-option>
                 <ion-select-option value="clarinet">Clarinet</ion-select-option>
                 <ion-select-option value="oboe">Oboe</ion-select-option>
+                <ion-select-option value="tuner">Tuner</ion-select-option>
               </ion-select>
             </ion-item>
 
             <ng-container *ngIf="selectedInstrument">
-              <ion-item [disabled]="isDisabled()" class="mode-item">
-                <ion-icon name="options-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
-                <ion-label>Mode</ion-label>
-              </ion-item>
-              <ion-item [disabled]="isDisabled()" lines="none" class="segment-item">
-                <ion-segment class="mode-switcher" (ionChange)="switchMode($event)" mode="ios" [value]="mode">
-                  <ion-segment-button *ngIf="selectedInstrument === 'trumpet'" value="trumpet">
-                    <ion-label>Trumpet</ion-label>
-                  </ion-segment-button>
-                  <ion-segment-button *ngIf="selectedInstrument === 'clarinet'" value="clarinet">
-                    <ion-label>Clarinet</ion-label>
-                  </ion-segment-button>
-                  <ion-segment-button *ngIf="selectedInstrument === 'oboe'" value="oboe">
-                    <ion-label>Oboe</ion-label>
-                  </ion-segment-button>
-                  <ion-segment-button value="tuner">
-                    <ion-label>Tuner</ion-label>
-                  </ion-segment-button>
-                </ion-segment>
-              </ion-item>
-
               <ion-item button (click)="openPicker('frequency')" [disabled]="isDisabled()">
                 <ion-icon name="pulse-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
                 <ion-label>Reference A4</ion-label>

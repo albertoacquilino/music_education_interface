@@ -38,7 +38,6 @@ import { close, musicalNote, musicalNotes, optionsOutline, pulseOutline, radio, 
 export class TabsComponent implements OnInit, OnDestroy {
   private routerSub?: Subscription;
   selectedInstrument = 'trumpet';
-  mode = 'trumpet';
   useFlatsAndSharps = false;
   useDynamics = false;
   isDarkMode = false;
@@ -87,25 +86,7 @@ export class TabsComponent implements OnInit, OnDestroy {
   private syncActiveTabFromUrl(): void {
     const tab: 'exercise' | 'tuner' = this.router.url.includes('/tuner') ? 'tuner' : 'exercise';
     this.activeTab = tab;
-    if (tab === 'tuner') {
-      this.syncSettingsModeForTunerRoute();
-    }
     void this.syncIonTabsSelection(tab);
-  }
-
-  /** Keeps the Options menu segment aligned with the standalone tuner route only. */
-  private syncSettingsModeForTunerRoute(): void {
-    if (this.mode !== 'tuner') {
-      this.mode = 'tuner';
-      this.saveStateToLocalStorage();
-    }
-  }
-
-  private restoreInstrumentModeAfterTunerRoute(): void {
-    if (this.mode === 'tuner') {
-      this.mode = this.selectedInstrument;
-      this.saveStateToLocalStorage();
-    }
   }
 
   private async syncIonTabsSelection(tab: 'exercise' | 'tuner'): Promise<void> {
@@ -146,15 +127,8 @@ export class TabsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const wasOnTunerRoute = this.router.url.includes('/tuner');
     const routeChanged = !this.router.url.includes(`/${tab}`);
     this.activeTab = tab;
-
-    if (tab === 'tuner') {
-      this.syncSettingsModeForTunerRoute();
-    } else if (wasOnTunerRoute) {
-      this.restoreInstrumentModeAfterTunerRoute();
-    }
 
     this.emitSettingsUpdated();
 
@@ -182,10 +156,14 @@ export class TabsComponent implements OnInit, OnDestroy {
 
     if (savedInstrument) {
       this.selectedInstrument = savedInstrument;
-      this.soundsService.setInstrument(this.selectedInstrument);
     }
 
-    this.mode = savedMode ?? this.selectedInstrument;
+    // Legacy: exercise "tuner mode" was stored separately from the instrument.
+    if (savedMode === 'tuner' && this.selectedInstrument !== 'tuner') {
+      this.selectedInstrument = 'tuner';
+    }
+
+    this.soundsService.setInstrument(this.selectedInstrument);
     this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage('useFlatsAndSharps', false);
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
     this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
@@ -204,7 +182,7 @@ export class TabsComponent implements OnInit, OnDestroy {
 
   private saveStateToLocalStorage() {
     localStorage.setItem('selectedInstrument', this.selectedInstrument);
-    localStorage.setItem('mode', this.mode);
+    localStorage.setItem('mode', this.selectedInstrument);
     localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
     localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
@@ -221,24 +199,12 @@ export class TabsComponent implements OnInit, OnDestroy {
 
   selectInstrument(event: any) {
     this.selectedInstrument = event.detail.value;
-    this.mode = this.selectedInstrument;
     this.soundsService.setInstrument(this.selectedInstrument);
     this.saveStateToLocalStorage();
     this.emitSettingsUpdated();
-  }
 
-  switchMode(event: { detail: { value?: string | number } }) {
-    const value = event.detail.value == null ? '' : String(event.detail.value);
-    if (!value) {
-      return;
-    }
-    this.mode = value;
-    this.saveStateToLocalStorage();
-    this.emitSettingsUpdated();
-
-    if (value === 'tuner') {
-      void this.navigateToTab('tuner', true);
-    } else if (this.router.url.includes('/tuner')) {
+    // Options instrument applies to Exercise, not the standalone Tuner page.
+    if (this.router.url.includes('/tuner')) {
       void this.navigateToTab('exercise', true);
     }
   }

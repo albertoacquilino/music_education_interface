@@ -263,6 +263,8 @@ export class NoteSelectorComponent implements OnInit {
       notes = CLARINET_NOTES;
     } else if (this._selectedInstrument === 'oboe') {
       notes = OBOE_NOTES;
+    } else if (this._selectedInstrument === 'tuner') {
+      notes = TRUMPET_NOTES;
     } else {
       console.warn('Unknown instrument:', this._selectedInstrument);
       return;

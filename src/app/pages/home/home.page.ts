@@ -51,27 +51,18 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   private readonly boundRefreshSettings = () => this.handleSettingsUpdated();
   private beatSubscription?: Subscription;
 
-  /**
-   * Indicates the mode - tuner or trumpet.
-   * @default 'trumpet'
-   */
   selectedInstrument = 'trumpet';
   private readonly instrumentDisplayNames: Record<string, string> = {
     trumpet: 'Trumpet',
     clarinet: 'Clarinet',
     oboe: 'Oboe',
+    tuner: 'Tuner',
   };
   language: string = 'en'; // Default language
   /**
    * Array of notes corresponding to the selected instrument.
    */
   NOTES: string[][] = TRUMPET_NOTES;
-
-  /**
-   * Current mode of the application.
-   * @default 'trumpet'
-   */
-  mode = 'trumpet';
 
   /**
    * Indicates whether the mute alert has been triggered.
@@ -219,10 +210,12 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       return TRUMPET_NOTES; // Use trumpet notes
     } else if (instrument === 'clarinet') {
       return CLARINET_NOTES; // Use clarinet notes
-    }else if(instrument === 'oboe'){
-      return OBOE_NOTES
+    } else if (instrument === 'oboe') {
+      return OBOE_NOTES;
+    } else if (instrument === 'tuner') {
+      return TRUMPET_NOTES;
     }
-    return []; // Return an empty array if no valid instrument is selected
+    return [];
   }
 
   /**
@@ -256,15 +249,15 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     // Load the selected instrument and its settings
     if (savedInstrument) {
       this.selectedInstrument = savedInstrument;
-      this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
-        this.soundsService.setInstrument(this.selectedInstrument);
     }
-    // Load the mode
-    if (savedMode) {
-      this.mode = savedMode;
-    } else {
-      this.mode = this.selectedInstrument; // Default to the selected instrument if no saved mode
+
+    // Legacy: exercise tuner was stored in `mode`, not as an instrument.
+    if (savedMode === 'tuner' && this.selectedInstrument !== 'tuner') {
+      this.selectedInstrument = 'tuner';
     }
+
+    this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
+    this.soundsService.setInstrument(this.selectedInstrument);
 
     // Load settings based on the selected instrument
     this.loadInstrumentSettings(this.selectedInstrument);
@@ -333,7 +326,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    */
   ionViewWillLeave(): void {
     this._tempo.stop();
-    if (this.mode === 'tuner') {
+    if (this.isTunerExercise()) {
       this.chromaticTuner?.stop();
     }
   }
@@ -355,8 +348,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * @returns void
    */
   selectInstrument(event: any) {
-    this.selectedInstrument = event.detail.value; // Store the selected instrument
-    this.mode = this.selectedInstrument; // Set mode to the same value as selected instrument
+    this.selectedInstrument = event.detail.value;
     console.log('Selected Instrument:', this.selectedInstrument);
     this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
     this.soundsService.setInstrument(this.selectedInstrument);
@@ -378,8 +370,8 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
     localStorage.setItem(`${this.selectedInstrument}_lowNote`, this.lowNote.toString());
     localStorage.setItem(`${this.selectedInstrument}_highNote`, this.highNote.toString());
-    localStorage.setItem('tempo', this._tempo.tempo$.value.toString()); // Save tempo for the selected instrument
-    localStorage.setItem('mode', this.mode);
+    localStorage.setItem('tempo', this._tempo.tempo$.value.toString());
+    localStorage.setItem('mode', this.selectedInstrument);
     localStorage.setItem('refFrequencyValue', this.refFrequencyValue$.toString());
   }
 
@@ -421,20 +413,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   dismissIOSWebAudioHint() {
     this.showIOSWebAudioHint = false;
     sessionStorage.setItem('ios-web-audio-hint-dismissed', 'true');
-  }
-
-  /**
-   * Switches the mode of the application.
-   * @param event - The event containing the new mode.
-   * @returns void
-   */
-  switchMode(event: any) {
-    if (this.mode == 'tuner') {
-      this.chromaticTuner.stop();
-    }
-    this.mode = event.detail.value;
-    this.saveCurrentStateToLocalStorage();
-    console.log(event);
   }
 
   /**
@@ -596,7 +574,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       switch (tempo.measure) {
         case 0:
           this.currentAction = "Rest";
-          if (this.mode == 'tuner') {
+          if (this.isTunerExercise()) {
             const meansArray = this.chromaticTuner.stopCapture();
             if (meansArray.length > 0) {
               this.collectedMeansObject = {
@@ -604,29 +582,25 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
                 [Object.keys(this.collectedMeansObject).length + 1]: meansArray
               };
             }
-          } else if (this.mode === this.selectedInstrument) {
+          } else {
             this.setPitchFeedbackWaiting('Waiting');
           }
           break;
         case 1:
           this.currentAction = "Listen";
-          if (this.mode === this.selectedInstrument) {
+          if (!this.isTunerExercise()) {
             this.setPitchFeedbackWaiting('Listen');
           }
           break;
         case 2:
           this.currentAction = "Play";
-          if (this.mode == 'tuner') {
+          if (this.isTunerExercise()) {
             this.chromaticTuner.startCapture();
-          } else if (this.mode === this.selectedInstrument) {
+          } else {
             this.setPitchFeedbackWaiting('Waiting');
             this.startPitchFeedback();
           }
           break;
-      }
-
-      if (this.mode == this.selectedInstrument) {
-        // Additional logic can be added here if needed
       }
     }
 
@@ -657,7 +631,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       await this.soundsService.unlockAudio();
       await this.soundsService.ensureSoundsReady();
 
-      if (this.mode === this.selectedInstrument) {
+      if (!this.isTunerExercise()) {
         await this.pitchService.primeMicrophoneAccess();
         await this.pitchService.connect();
       }
@@ -666,7 +640,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       this.tabsService.setDisabled(true);
       this.cdr.detectChanges();
 
-      if (this.mode === 'tuner' && this.chromaticTuner) {
+      if (this.isTunerExercise() && this.chromaticTuner) {
         await this.chromaticTuner.prepare();
       }
     } catch (error) {
@@ -797,7 +771,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    */
   stop() {
     this._tempo.stop();
-    if (this.mode == 'tuner' && this.chromaticTuner) {
+    if (this.isTunerExercise() && this.chromaticTuner) {
       const meansArray = this.chromaticTuner.stop();
       if (meansArray.length > 0) {
         this.collectedMeansObject = {
@@ -827,6 +801,11 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       ?? this.selectedInstrument.charAt(0).toUpperCase() + this.selectedInstrument.slice(1);
   }
 
+  /** Exercise uses the chromatic tuner instrument (not trumpet/clarinet/oboe diagrams). */
+  isTunerExercise(): boolean {
+    return this.selectedInstrument === 'tuner';
+  }
+
   /**
    * Returns a boolean indicating whether the tempo is currently playing or not.
    * @returns {boolean} A boolean indicating whether the tempo is currently playing.
@@ -839,19 +818,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    return 'assets/images/clarinet_notes_images/_${this.NOTES[note][0]}.png';
     //return `assets/images/${this.NOTES}_notes_images/_${this.NOTES[note][0]}.png`;
   }
-  switchToMode(mode_new: string) {
-    if (this.isPlaying()) {
-      return;
-    }
-    const event = {
-      detail: {
-        value: mode_new
-      }
-    };
-    this.switchMode(event);
-    this.saveCurrentStateToLocalStorage();
-  }
-
   /**
    * Opens a picker for selecting frequency or tempo.
    * @param type - The type of picker to open ('frequency' or 'tempo').
@@ -905,11 +871,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
             if (type === 'frequency') {
               this.refFrequencyValue$ = value[type].value;
               this.refFrequencyService.setRefFrequency(this.refFrequencyValue$);
-              if (this.mode==='tuner'){
-                this.mode='tuner';
-              }else{
-                this.mode = this.selectedInstrument;
-              }
               this.saveCurrentStateToLocalStorage();
             } else if (type === 'tempo') {
               this._tempo.setTempo(value[type].value);
