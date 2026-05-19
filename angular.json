@@ -27,6 +27,11 @@
             "assets": [
               {
                 "glob": "**/*",
+                "input": "icons",
+                "output": "icons"
+              },
+              {
+                "glob": "**/*",
                 "input": "src/assets",
                 "output": "assets"
               },
@@ -59,8 +64,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kb",
-                  "maximumError": "6kb"
+                  "maximumWarning": "6kb",
+                  "maximumError": "14kb"
                 }
               ],
               "fileReplacements": [
@@ -115,6 +120,11 @@
             "karmaConfig": "karma.conf.js",
             "inlineStyleLanguage": "scss",
             "assets": [
+              {
+                "glob": "**/*",
+                "input": "icons",
+                "output": "icons"
+              },
               {
                 "glob": "**/*",
                 "input": "src/assets",

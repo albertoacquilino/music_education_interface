@@ -359,3 +359,8 @@ export const OBOE_POSITIONS = [
     'G6',
     'G6s',
 ];
+
+/** App brand icons (served from /icons after build). Use root-relative paths for routed pages. */
+export const APP_BRAND_ICON = '/icons/icon-48.webp';
+export const APP_BRAND_ICON_SRCSET_MOBILE = '/icons/icon-48.webp 48w, /icons/icon-72.webp 72w';
+export const APP_BRAND_ICON_SRCSET_NAV = '/icons/icon-48.webp 48w, /icons/icon-72.webp 72w, /icons/icon-96.webp 96w';

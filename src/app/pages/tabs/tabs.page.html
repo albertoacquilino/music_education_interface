@@ -6,127 +6,238 @@
   See the LICENSE file for more details.
 -->
 
-<ion-menu contentId="tabs-shell" menuId="settingsMenu">
-    <ion-header>
-        <ion-toolbar>
-            <ion-title>Options</ion-title>
-        </ion-toolbar>
-    </ion-header>
-    <ion-content class="ion-padding">
-        <ion-list>
+<ion-menu contentId="tabs-shell" menuId="settingsMenu" side="start" type="overlay">
+  <ion-header>
+    <ion-toolbar>
+      <ion-title>
+        <div class="menu-brand">
+          <img
+            [src]="brandIcon"
+            [attr.srcset]="brandIconSrcSetMobile"
+            sizes="28px"
+            alt=""
+            class="menu-brand-logo"
+            width="28"
+            height="28"
+          />
+          <span>Options</span>
+        </div>
+      </ion-title>
+      <ion-buttons slot="end">
+        <ion-button fill="clear" (click)="closeMenu()" aria-label="Close settings">
+          <ion-icon name="close" slot="icon-only"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-header>
+  <ion-content class="ion-padding">
+    <div class="menu-sections">
+      <!-- Instrument Section -->
+      <div class="menu-section">
+        <h3 class="section-title">
+          <ion-icon name="musical-note" aria-hidden="true"></ion-icon>
+          Instrument
+        </h3>
+        <div class="section-card">
+          <ion-list lines="none">
             <ion-item [disabled]="isDisabled()">
-                <ion-label>Select Instrument</ion-label>
-                <ion-select
-                    (ionChange)="selectInstrument($event)"
-                    mode="ios"
-                    [value]="selectedInstrument"
-                    interface="popover"
-                    [interfaceOptions]="instrumentSelectInterfaceOptions"
-                >
-                    <ion-select-option value="trumpet">Trumpet</ion-select-option>
-                    <ion-select-option value="clarinet">Clarinet</ion-select-option>
-                    <ion-select-option value="oboe">Oboe</ion-select-option>
-                </ion-select>
+              <ion-icon name="musical-notes" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+              <ion-label>Select Instrument</ion-label>
+              <ion-select
+                (ionChange)="selectInstrument($event)"
+                mode="ios"
+                [value]="selectedInstrument"
+                interface="popover"
+                [interfaceOptions]="instrumentSelectInterfaceOptions"
+              >
+                <ion-select-option value="trumpet">Trumpet</ion-select-option>
+                <ion-select-option value="clarinet">Clarinet</ion-select-option>
+                <ion-select-option value="oboe">Oboe</ion-select-option>
+                <ion-select-option value="tuner">Tuner</ion-select-option>
+              </ion-select>
             </ion-item>
 
             <ng-container *ngIf="selectedInstrument">
-                <ion-item [disabled]="isDisabled()">
-                    <ion-label>Mode</ion-label>
-                    <ion-segment class="mode-switcher" (ionChange)="switchMode($event)" mode="ios" [value]="mode">
-                        <ion-segment-button *ngIf="selectedInstrument === 'trumpet'" value="trumpet">
-                            <ion-label>TRUMPET</ion-label>
-                        </ion-segment-button>
-                        <ion-segment-button *ngIf="selectedInstrument === 'clarinet'" value="clarinet">
-                            <ion-label>CLARINET</ion-label>
-                        </ion-segment-button>
-                        <ion-segment-button *ngIf="selectedInstrument === 'oboe'" value="oboe">
-                            <ion-label>OBOE</ion-label>
-                        </ion-segment-button>
-                        <ion-segment-button value="tuner">
-                            <ion-label>TUNER</ion-label>
-                        </ion-segment-button>
-                    </ion-segment>
-                </ion-item>
-
-                <ion-item button (click)="openPicker('frequency')" [disabled]="isDisabled()">
-                    <ion-label>A4</ion-label>
-                    <ion-note slot="end">{{ refFrequencyValue$ }} Hz</ion-note>
-                </ion-item>
-
-                <ion-item>
-                    <ion-toggle [checked]="useFlatsAndSharps" (ionChange)="switchUseFlatsAndSharps($event)" [disabled]="isDisabled()">
-                        <b>&flat; &amp; &sharp;</b>
-                    </ion-toggle>
-                </ion-item>
-
-                <ion-item [disabled]="isDisabled()">
-                    <ion-label>Nomenclature</ion-label>
-                    <ion-select
-                        (ionChange)="changeLanguage($event)"
-                        [value]="language"
-                        interface="alert"
-                        [interfaceOptions]="nomenclatureSelectInterfaceOptions"
-                    >
-                        <ion-select-option value="en">C, D, E</ion-select-option>
-                        <ion-select-option value="it">Do, Re, Mi</ion-select-option>
-                    </ion-select>
-                </ion-item>
-
-                <ion-item>
-                    <ion-toggle [checked]="useDynamics" (ionChange)="switchUseDynamics($event)" [disabled]="isDisabled()">
-                        Dynamics
-                    </ion-toggle>
-                </ion-item>
-
-                <ion-item>
-                    <ion-toggle [checked]="isDarkMode" (ionChange)="switchDarkMode($event)">
-                        Dark Mode
-                    </ion-toggle>
-                </ion-item>
+              <ion-item button (click)="openPicker('frequency')" [disabled]="isDisabled()">
+                <ion-icon name="pulse-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+                <ion-label>Reference A4</ion-label>
+                <ion-note slot="end">{{ refFrequencyValue$ }} Hz</ion-note>
+              </ion-item>
             </ng-container>
-        </ion-list>
-    </ion-content>
+          </ion-list>
+        </div>
+      </div>
+
+      <!-- Music Section -->
+      <div class="menu-section" *ngIf="selectedInstrument">
+        <h3 class="section-title">
+          <ion-icon name="musical-notes" aria-hidden="true"></ion-icon>
+          Music
+        </h3>
+        <div class="section-card">
+          <ion-list lines="none">
+            <ion-item>
+              <ion-icon name="text-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+              <ion-label>Accidentals</ion-label>
+              <ion-toggle
+                [checked]="useFlatsAndSharps"
+                (ionChange)="switchUseFlatsAndSharps($event)"
+                [disabled]="isDisabled()"
+              ></ion-toggle>
+            </ion-item>
+
+            <ion-item [disabled]="isDisabled()">
+              <ion-icon name="language-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+              <ion-label>Note Names</ion-label>
+              <ion-select
+                (ionChange)="changeLanguage($event)"
+                [value]="language"
+                interface="alert"
+                [interfaceOptions]="nomenclatureSelectInterfaceOptions"
+              >
+                <ion-select-option value="en">C, D, E</ion-select-option>
+                <ion-select-option value="it">Do, Re, Mi</ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-icon name="volume-high-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+              <ion-label>Dynamics</ion-label>
+              <ion-toggle
+                [checked]="useDynamics"
+                (ionChange)="switchUseDynamics($event)"
+                [disabled]="isDisabled()"
+              ></ion-toggle>
+            </ion-item>
+          </ion-list>
+        </div>
+      </div>
+
+      <!-- Appearance Section -->
+      <div class="menu-section">
+        <h3 class="section-title">
+          <ion-icon name="eye-outline" aria-hidden="true"></ion-icon>
+          Appearance
+        </h3>
+        <div class="section-card">
+          <ion-list lines="none">
+            <ion-item>
+              <ion-icon name="moon-outline" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
+              <ion-label>Dark Mode</ion-label>
+              <ion-toggle
+                [checked]="isDarkMode"
+                (ionChange)="switchDarkMode($event)"
+              ></ion-toggle>
+            </ion-item>
+          </ion-list>
+        </div>
+      </div>
+    </div>
+  </ion-content>
 </ion-menu>
 
 <div class="ion-page" id="tabs-shell">
-    <ion-tabs
-        #tabs
-        (ionTabsDidChange)="onChange($event)"
-    >
-        <ion-tab-bar class="custom-tab-bar d-flex ion-justify-content-between">
-            <ion-tab-button
-                tab
-                [disabled]="isDisabled()"
-                (click)="openMenu()"
-            >
-                <ion-icon
-                    name="settings-outline"
-                    style="margin-bottom: 2px;"
-                ></ion-icon>
-                Options
-            </ion-tab-button>
-            <ion-tab-button
-                tab="exercise"
-                [disabled]="isDisabled()"
-                (click)="prepareExerciseMedia()"
-            >
-                <ion-icon
-                    name="musical-notes"
-                    style="margin-bottom: 2px;"
-                ></ion-icon>
-                Exercise
-            </ion-tab-button>
-            <ion-tab-button
-                tab="tuner"
-                [disabled]="isDisabled()"
-                (click)="prepareTunerMedia()"
-            >
-                <ion-icon
-                    name="radio"
-                    style="margin-bottom: 2px;"
-                ></ion-icon>
-                Tuner
-            </ion-tab-button>
-        </ion-tab-bar>
-    </ion-tabs>
+  <!-- Tablet + desktop top navigation -->
+  <header class="app-nav" aria-label="Main navigation">
+    <div class="app-nav-inner">
+      <div class="app-nav-brand">
+        <img
+          [src]="brandIcon"
+          [attr.srcset]="brandIconSrcSetNav"
+          sizes="(min-width: 1024px) 40px, 32px"
+          alt="Music Education Interface"
+          class="app-nav-logo"
+          width="32"
+          height="32"
+        />
+        <span class="app-nav-title app-nav-title--full">Music Education Interface</span>
+        <span class="app-nav-title app-nav-title--short">Music Education Interface</span>
+      </div>
+
+      <nav class="app-nav-tabs" aria-label="Sections">
+        <button
+          class="app-nav-tab"
+          type="button"
+          [class.active]="activeTab === 'exercise'"
+          [disabled]="isDisabled()"
+          [attr.aria-current]="activeTab === 'exercise' ? 'page' : null"
+          (click)="goToExercise()"
+        >
+          <ion-icon name="musical-notes" aria-hidden="true"></ion-icon>
+          <span>Exercise</span>
+        </button>
+        <button
+          class="app-nav-tab"
+          type="button"
+          [class.active]="activeTab === 'tuner'"
+          [disabled]="isDisabled()"
+          [attr.aria-current]="activeTab === 'tuner' ? 'page' : null"
+          (click)="goToTuner()"
+        >
+          <ion-icon name="radio" aria-hidden="true"></ion-icon>
+          <span>Tuner</span>
+        </button>
+      </nav>
+
+      <button
+        class="app-nav-options"
+        type="button"
+        [disabled]="isDisabled()"
+        aria-label="Open options"
+        (click)="openMenu()"
+      >
+        <ion-icon name="settings-outline" aria-hidden="true"></ion-icon>
+        <span class="app-nav-options-label">Options</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile top bar -->
+  <div class="mobile-topbar">
+    <div class="mobile-topbar-brand">
+      <img
+        [src]="brandIcon"
+        [attr.srcset]="brandIconSrcSetMobile"
+        sizes="28px"
+        alt="Music Education Interface"
+        class="mobile-topbar-logo"
+        width="28"
+        height="28"
+      />
+      <span class="mobile-topbar-text">Music Education Interface</span>
+    </div>
+  </div>
+
+  <ion-tabs
+    #tabs
+    (ionTabsDidChange)="onTabsChange($event)"
+  >
+    <ion-tab-bar class="custom-tab-bar d-flex ion-justify-content-between">
+      <ion-tab-button
+        [disabled]="isDisabled()"
+        (click)="openMenu()"
+      >
+        <ion-icon name="settings-outline"></ion-icon>
+        <ion-label>Options</ion-label>
+      </ion-tab-button>
+      <ion-tab-button
+        tab="exercise"
+        href="/home/exercise"
+        [selected]="activeTab === 'exercise'"
+        [disabled]="isDisabled()"
+      >
+        <ion-icon name="musical-notes"></ion-icon>
+        <ion-label>Exercise</ion-label>
+      </ion-tab-button>
+      <ion-tab-button
+        tab="tuner"
+        href="/home/tuner"
+        [selected]="activeTab === 'tuner'"
+        [disabled]="isDisabled()"
+      >
+        <ion-icon name="radio"></ion-icon>
+        <ion-label>Tuner</ion-label>
+      </ion-tab-button>
+    </ion-tab-bar>
+  </ion-tabs>
 </div>
