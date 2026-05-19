@@ -15,10 +15,12 @@
 }
 
 .trumpet-img {
-    width: auto;
-    max-width: 100%;
-    height: min(100%, clamp(170px, 36vh, 340px));
-    max-height: min(100%, clamp(170px, 36vh, 340px));
+    display: block;
+    width: var(--idle-instrument-img-width, auto);
+    height: auto;
+    max-width: var(--idle-instrument-img-width, var(--idle-instrument-size-cap, 1000px));
+    max-height: var(--idle-instrument-img-max-height, var(--idle-instrument-size-cap, 1000px));
+    object-fit: contain;
 }
 
 .slide,
@@ -42,14 +44,11 @@
 
 @media screen and (orientation: landscape) {
     .trumpet-img {
-        height: min(100%, clamp(170px, 44vh, 320px));
-        max-height: min(100%, clamp(170px, 44vh, 320px));
-        transform: none; 
-    }
-}
-@media screen and (min-height:720px) {
-    .trumpet-img {
-        height: min(100%, clamp(190px, 34vh, 300px));
+        width: var(--idle-instrument-img-width, auto);
+        height: auto;
+        max-width: var(--idle-instrument-img-width, var(--idle-instrument-size-cap, 1000px));
+        max-height: var(--idle-instrument-img-max-height, var(--idle-instrument-size-cap, 1000px));
+        transform: none;
     }
 }
 // @media screen and (orientation: landscape) and (max-height: 600px) {

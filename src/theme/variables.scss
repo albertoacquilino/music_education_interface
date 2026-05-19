@@ -12,6 +12,27 @@
 
 /** Ionic CSS Variables **/
 :root {
+  /** App shell layout **/
+  --app-content-max-width: 1120px;
+  --idle-instrument-size-cap: 1000px;
+  --idle-instrument-scale: 0.82;
+  --idle-instrument-vertical-scale: 0.72;
+  --app-shell-bg: #f0f2f5;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f7f8fa;
+  --app-border: #e5e7eb;
+  --app-radius-sm: 10px;
+  --app-radius-md: 14px;
+  --app-gap: clamp(6px, 1.2vw, 12px);
+  --app-pad: clamp(8px, 1.5vw, 16px);
+  --app-nav-height-mobile: 48px;
+  --app-nav-height-desktop: 60px;
+  --app-topbar-height-mobile: 52px;
+  --app-tabbar-height: 56px;
+  --app-footer-height: 56px;
+  --app-top-inset: 0px;
+  --app-bottom-inset: 0px;
+
   /** primary **/
   --ion-color-primary: #3880ff;
   --ion-color-primary-rgb: 56, 128, 255;

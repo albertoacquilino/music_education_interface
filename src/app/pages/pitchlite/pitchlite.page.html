@@ -1,29 +1,17 @@
-<!--
-  This file is part of the Music Education Interface project.
-  Copyright (C) 2025 Alberto Acquilino
-
-  Licensed under the GNU Affero General Public License v3.0.
-  See the LICENSE file for more details.
--->
-
-<!--<ion-header>
-  <ion-toolbar>
-    <ion-title>
-    </ion-title>
-    <ion-buttons slot="end">
-      <ion-buttons (click)="goToProfile()">
-        <ion-icon name="person-circle-outline" style="font-size: 32px;"></ion-icon>
-      </ion-buttons>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>-->
-<ion-content [fullscreen]="true" scrollY="false">
-  <div class="chromatic-tuner">
-    <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
-  </div>
-</ion-content>
-<!-- <ion-footer>
-  <ion-button (click)="startStop()" expand="block">
-    {{detecting ? 'Stop':'Start'}}
-  </ion-button>
-</ion-footer> -->
+<!--
+  This file is part of the Music Education Interface project.
+  Copyright (C) 2025 Alberto Acquilino
+
+  Licensed under the GNU Affero General Public License v3.0.
+  See the LICENSE file for more details.
+-->
+
+<div class="ion-page tuner-page">
+  <ion-content [fullscreen]="true" [scrollY]="false">
+    <div class="app-viewport tuner-viewport">
+      <div class="tuner-card surface-panel">
+        <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+      </div>
+    </div>
+  </ion-content>
+</div>

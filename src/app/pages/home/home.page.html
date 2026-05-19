@@ -7,11 +7,34 @@
 -->
 
 <div class="ion-page" id="main-content">
-  <ion-content [fullscreen]="true">
-    <div id="container">
+  <ion-content [fullscreen]="true" [scrollY]="false">
+    <div id="container" class="app-viewport">
       <div class="wrapper" id="wrapper" [class.is-playing]="isPlaying()" [class.is-idle]="!isPlaying()">
-        <div class="top-middle-container">
-          <div class="top" [ngClass]="!isPlaying()?'landscape-d-none':''">
+
+        <!-- IDLE STATE: setup screen (unchanged) -->
+        <ng-container *ngIf="!isPlaying()">
+          <div class="idle-instrument-panel surface-panel">
+            <div class="idle-instrument-display"
+              [class.is-vertical-instrument]="selectedInstrument === 'clarinet' || selectedInstrument === 'oboe'">
+              <ng-container *ngIf="selectedInstrument === 'trumpet'">
+                <trumpet-diagram [trumpetButtons]="trumpetBtns"></trumpet-diagram>
+              </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'clarinet'">
+                <img [src]="clarinetPosition" alt="Clarinet Position" />
+              </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'oboe'">
+                <img [src]="oboePosition" alt="Oboe Position" />
+              </ng-container>
+            </div>
+            <div class="idle-instrument-label" *ngIf="selectedInstrument">
+              <span>{{ selectedInstrumentDisplayName }}</span>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- PLAYING ONLY: instrument + score left, status rail right -->
+        <div class="exercise-shell" *ngIf="isPlaying()">
+          <aside class="exercise-rail exercise-rail--status surface-panel" aria-label="Beat and phase">
             <div class="metronome status-panel">
               <div class="metronome-bullet">
                 <h1 id="metronome-label" *ngIf="beat$|async as beat">
@@ -20,52 +43,57 @@
                 <semaphore-light [currentAction]="currentAction"></semaphore-light>
               </div>
             </div>
-            <ng-container *ngIf="mode === 'tuner'">
-              <div class="chromatic-tuner visual-panel">
-                <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
-              </div>
-            </ng-container>
-            <ng-container *ngIf="selectedInstrument === 'trumpet' && mode === 'trumpet'">
-              <div class="trumpet visual-panel">
-                <trumpet-diagram [trumpetButtons]="trumpetBtns"></trumpet-diagram>
-              </div>
-            </ng-container>
-            <ng-container *ngIf="selectedInstrument === 'clarinet' && mode === 'clarinet'">
-              <div class="clarinet visual-panel">
-               
-                <img [src]="clarinetPosition" alt="Clarinet Position" />
-              </div>
-            </ng-container>
-            <ng-container *ngIf="selectedInstrument === 'oboe' && mode === 'oboe'">
-              <div class="oboe visual-panel">
-               
-                <img [src]="oboePosition" alt="Oboe Position" />
-              </div>
-            </ng-container>
+          </aside>
 
-          </div>
-          <!--MIDDLE-->
-          <div class="middle" *ngIf="isPlaying()">
-            <div class="score">
-              <score-view id="score-image" [score]="score" [language]="language"></score-view>
+          <section class="stage-practice surface-panel" aria-label="Practice">
+            <div class="stage-instrument"
+              [class.is-vertical-instrument]="selectedInstrument === 'clarinet' || selectedInstrument === 'oboe'"
+              aria-label="Instrument">
+              <ng-container *ngIf="selectedInstrument === 'trumpet'">
+                <div class="trumpet visual-panel">
+                  <trumpet-diagram [trumpetButtons]="trumpetBtns"></trumpet-diagram>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'clarinet'">
+                <div class="clarinet visual-panel">
+                  <img [src]="clarinetPosition" alt="Clarinet Position" />
+                </div>
+              </ng-container>
+              <ng-container *ngIf="selectedInstrument === 'oboe'">
+                <div class="oboe visual-panel">
+                  <img [src]="oboePosition" alt="Oboe Position" />
+                </div>
+              </ng-container>
             </div>
-          </div>
+
+            <div class="stage-notation" aria-label="Score">
+              <div class="pitch-feedback" *ngIf="mode !== 'tuner' && isPlaying()" [ngClass]="pitchAccuracyClass">
+                <div class="pitch-feedback-label">{{ pitchFeedbackLabel }}</div>
+                <div class="pitch-bar" aria-hidden="true">
+                  <div class="pitch-marker" [style.left.%]="pitchBarPosition"></div>
+                </div>
+              </div>
+
+              <div class="score">
+                <score-view id="score-image" [score]="score" [language]="language"></score-view>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="bottom" *ngIf="!isPlaying()">
-          <div class="controls controls-margin">
-            <!--TEMPO-->
+          <div class="controls controls-margin surface-panel">
             <div class="tempo-wrapper">
-                <tempo-selector *ngIf="tempo$ | async as tempo" 
-                  [tempo]="tempo" 
-                  (change)="changeTempo($event)"
-                ></tempo-selector>              
+              <tempo-selector *ngIf="tempo$ | async as tempo"
+                [tempo]="tempo"
+                (change)="changeTempo($event)"
+              ></tempo-selector>
             </div>
 
             <div class="low-note-wrapper">
-              <note-selector 
+              <note-selector
                 label="Lowest Note:"
-                [note]="lowNote" 
+                [note]="lowNote"
                 [selectedInstrument]="selectedInstrument"
                 [useFlatsAndSharps]="useFlatsAndSharps"
                 (change)="changeLowNote($event)"
@@ -73,7 +101,7 @@
             </div>
 
             <div class="high-note-wrapper">
-              <note-selector 
+              <note-selector
                 label="Highest Note:"
                 [note]="highNote"
                 [selectedInstrument]="selectedInstrument"
@@ -81,7 +109,6 @@
                 (change)="changeHighNote($event)"
               ></note-selector>
             </div>
-
           </div>
 
           <div class="sounds-loading-hint" *ngIf="soundsLoading$ | async">
@@ -94,15 +121,16 @@
             <button type="button" class="ios-audio-hint-dismiss" (click)="dismissIOSWebAudioHint()">Dismiss</button>
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
   </ion-content>
 
-  <ion-footer>
-    <ion-button (click)="startStop()" expand="block" [disabled]="(soundsLoading$ | async) && !isPlaying()">
-      {{isPlaying() ? 'Stop': ((soundsLoading$ | async) ? 'Loading sounds...' : 'Start')}}
-    </ion-button>
+  <ion-footer class="exercise-footer">
+    <div class="exercise-footer-inner">
+      <ion-button (click)="startStop()" expand="block" [disabled]="(soundsLoading$ | async) && !isPlaying()">
+        {{isPlaying() ? 'Stop': ((soundsLoading$ | async) ? 'Loading sounds...' : 'Start')}}
+      </ion-button>
+    </div>
   </ion-footer>
-
 </div>

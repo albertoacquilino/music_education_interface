@@ -5,17 +5,15 @@
  * Licensed under the GNU Affero General Public License v3.0.
  * See the LICENSE file for more details.
  */
-import { AfterViewInit, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { AlertController, IonicModule, PickerController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Mute } from '@capgo/capacitor-mute';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faCircleChevronDown, faCircleChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { Howler } from 'howler';
 import { range } from 'lodash';
-import { Observable, interval, tap } from 'rxjs';
+import { Observable, Subscription, interval, tap } from 'rxjs';
 import { ChromaticTunerComponent } from 'src/app/components/chromatic-tuner/chromatic-tuner.component';
 import { NoteSelectorComponent } from 'src/app/components/note-selector/note-selector.component';
 import { ScoreViewComponent } from 'src/app/components/score/score.component';
@@ -39,7 +37,7 @@ import { BeatService } from '../../services/beat.service';
   styleUrls: ['home.page.scss'],
   standalone: true,
   imports: [
-    IonicModule, FontAwesomeModule,
+    IonicModule,
     ScoreViewComponent,
     CommonModule, SemaphoreLightComponent,
     TrumpetDiagramComponent, TempoSelectorComponent, NoteSelectorComponent,
@@ -50,15 +48,19 @@ import { BeatService } from '../../services/beat.service';
  */
 export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(ChromaticTunerComponent) private chromaticTuner!: ChromaticTunerComponent;
-  private resizeObserver: ResizeObserver | null = null;
-  private readonly boundScaleContent = () => this.scaleContent();
   private readonly boundRefreshSettings = () => this.handleSettingsUpdated();
+  private beatSubscription?: Subscription;
 
   /**
    * Indicates the mode - tuner or trumpet.
    * @default 'trumpet'
    */
   selectedInstrument = 'trumpet';
+  private readonly instrumentDisplayNames: Record<string, string> = {
+    trumpet: 'Trumpet',
+    clarinet: 'Clarinet',
+    oboe: 'Oboe',
+  };
   language: string = 'en'; // Default language
   /**
    * Array of notes corresponding to the selected instrument.
@@ -103,13 +105,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   /**
    * The FontAwesome icon for a circle chevron down.
    */
-  faCircleChevronDown = faCircleChevronDown;
-
-  /**
-   * The FontAwesome icon for a circle chevron up.
-   */
-  faCircleChevronUp = faCircleChevronUp;
-
   /**
    * The observable for the tempo.
    */
@@ -146,30 +141,13 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    */
   currentAction = '';
 
-  /**
-   * The trumpet position image path.
-   */
-  trumpetPosition ="assets/images/trumpet_positions/pos_1.png";
-
-  /**
-   * The clarinet position image path.
-   */
   clarinetPosition = "assets/images/clarinet_positions/A3.svg";
   oboePosition = "assets/images/oboe_positions/A4.svg";
-  /**
-   * The score image path.
-   */
-  scoreImage = "assets/images/score_images/G2.svg";
 
   /**
    * The trumpet buttons to highlight for each note.
    */
   trumpetBtns: number[] = [];
-
-  /**
-   * The note images.
-   */
-  noteImages: string[] = this.getNoteImages();
 
   /**
    * The observable for the beat.
@@ -187,6 +165,13 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   refFrequencyValue$!: number;
 
   showIOSWebAudioHint = false;
+
+  // Pitch feedback during exercise
+  pitchCents = 0;
+  pitchAccuracyClass: 'in-tune' | 'close' | 'far' | 'waiting' = 'waiting';
+  pitchFeedbackLabel = 'Waiting';
+  pitchBarPosition = 50;
+  private pitchSubscription: Subscription | null = null;
 
   /**
    * An object to collect all the notes played.
@@ -206,13 +191,13 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     private soundsService: SoundsService,
     private _picker: PickerController,
     private _tempo: BeatService,
-    private _sounds: SoundsService,
     public firebase: FirebaseService,
     private alertController: AlertController,
     private refFrequencyService: RefFreqService,
     private tabsService: TabsService,
     private pitchService: PitchService,
     private router: Router,
+    private cdr: ChangeDetectorRef,
   ) {
     this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
   
@@ -241,14 +226,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /**
-   * Retrieves the note images for the selected instrument.
-   * @returns An array of paths to note images.
-   */
-  private getNoteImages(): string[] {
-    return this.NOTES.map(note => `assets/images/clarinet_notes_images/_${note[0]}.svg`);
-  }
-
-  /**
    * Lifecycle hook that is called after the component has been initialized.
    */
   ngOnInit(): void {
@@ -259,15 +236,12 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     this.showIOSWebAudioHint = this.isIOSWebBrowser()
       && sessionStorage.getItem('ios-web-audio-hint-dismissed') !== 'true';
     this.loadStateFromLocalStorage();
+    this.beatSubscription = this.beat$.subscribe();
   }
 
   ngOnDestroy(): void {
-    window.removeEventListener('resize', this.boundScaleContent);
-    window.removeEventListener('orientationchange', this.boundScaleContent);
-    window.visualViewport?.removeEventListener('resize', this.boundScaleContent);
     window.removeEventListener('mei-settings-updated', this.boundRefreshSettings);
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = null;
+    this.beatSubscription?.unsubscribe();
   }
 
   /**
@@ -283,8 +257,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     if (savedInstrument) {
       this.selectedInstrument = savedInstrument;
       this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
-      this.noteImages = this.getNoteImages();
-      this.soundsService.setInstrument(this.selectedInstrument);
+        this.soundsService.setInstrument(this.selectedInstrument);
     }
     // Load the mode
     if (savedMode) {
@@ -307,8 +280,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
 
   private handleSettingsUpdated() {
     this.loadStateFromLocalStorage();
-    this.noteImages = this.getNoteImages();
-    this.queueScaleContent();
   }
   
   /**
@@ -356,15 +327,15 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
    * Lifecycle hook that is called when the view has entered.
    * @returns void
    */
-  ionViewDidEnter(): void {}
-
   /**
    * Lifecycle hook that is called when the view is about to leave.
    * @returns void
    */
   ionViewWillLeave(): void {
     this._tempo.stop();
-    if (this.mode == "tuner") this.chromaticTuner.stop();
+    if (this.mode === 'tuner') {
+      this.chromaticTuner?.stop();
+    }
   }
 
   /**
@@ -388,7 +359,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     this.mode = this.selectedInstrument; // Set mode to the same value as selected instrument
     console.log('Selected Instrument:', this.selectedInstrument);
     this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
-    this.noteImages = this.getNoteImages();
     this.soundsService.setInstrument(this.selectedInstrument);
 
     // Load settings for the newly selected instrument
@@ -396,7 +366,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
 
     // Save the current state to local storage
     this.saveCurrentStateToLocalStorage();
-    this.queueScaleContent();
   }
 
   /**
@@ -466,7 +435,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     this.mode = event.detail.value;
     this.saveCurrentStateToLocalStorage();
     console.log(event);
-    this.queueScaleContent();
   }
 
   /**
@@ -500,7 +468,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
     if (!this.useDynamics) {
       this.score = scoreFromNote(this.NOTES[this.currentNote][0], this.selectedInstrument);
-      this._sounds.setVolume(1.0);
+      this.soundsService.setVolume(1.0);
     }
   }
 
@@ -558,7 +526,6 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   updateTrumpetPosition(note: number) {
     const trumpetImg = POSITIONS[note];
     this.trumpetBtns = TRUMPET_BTN[note];
-    this.trumpetPosition = `assets/images/trumpet_positions/${trumpetImg}.png`;
   }
 
   /**
@@ -583,11 +550,9 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   updateScore(noteNumber: number) {
     const _notes = this.NOTES[noteNumber];
     const scoreImage = _notes.length == 1 ? _notes[0] : _notes[Math.floor(Math.random() * 2)];
-    this.scoreImage = `assets/images/score_images/${scoreImage}.svg`;
-
     if (this.useDynamics) {
       const dynamic = DYNAMICS[Math.floor(Math.random() * DYNAMICS.length)];
-      this._sounds.setVolume(dynamic.volume);
+      this.soundsService.setVolume(dynamic.volume);
       this.score = scoreFromNote(scoreImage,this.selectedInstrument, dynamic.label);
     } else {
       this.score = scoreFromNote(scoreImage, this.selectedInstrument);
@@ -617,7 +582,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     if (tempo.beat == 0) {
       if (tempo.measure == 0) {
         this.currentNote = this.nextNote();
-        this._sounds.currentNote = this.currentNote;
+        this.soundsService.currentNote = this.currentNote;
         this.updateScore(this.currentNote);
         if (this.selectedInstrument === "trumpet") {
           this.updateTrumpetPosition(this.currentNote);
@@ -639,15 +604,23 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
                 [Object.keys(this.collectedMeansObject).length + 1]: meansArray
               };
             }
+          } else if (this.mode === this.selectedInstrument) {
+            this.setPitchFeedbackWaiting('Waiting');
           }
           break;
         case 1:
           this.currentAction = "Listen";
+          if (this.mode === this.selectedInstrument) {
+            this.setPitchFeedbackWaiting('Listen');
+          }
           break;
         case 2:
           this.currentAction = "Play";
           if (this.mode == 'tuner') {
             this.chromaticTuner.startCapture();
+          } else if (this.mode === this.selectedInstrument) {
+            this.setPitchFeedbackWaiting('Waiting');
+            this.startPitchFeedback();
           }
           break;
       }
@@ -662,6 +635,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       console.log('finished');
       console.log('Collected Means', this.collectedMeansObject);
       this.tabsService.setDisabled(false);
+      this.teardownAfterExercise();
     }
   }
 
@@ -675,16 +649,33 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     if (this._tempo.playing$.value) {
       this.stop();
       this.tabsService.setDisabled(false);
-    } else {
+      this.cdr.markForCheck();
+      return;
+    }
+
+    try {
       await this.soundsService.unlockAudio();
       await this.soundsService.ensureSoundsReady();
-      if (this.mode === 'tuner') {
-        await this.chromaticTuner.prepare();
+
+      if (this.mode === this.selectedInstrument) {
+        await this.pitchService.primeMicrophoneAccess();
+        await this.pitchService.connect();
       }
+
       this.start();
       this.tabsService.setDisabled(true);
+      this.cdr.detectChanges();
+
+      if (this.mode === 'tuner' && this.chromaticTuner) {
+        await this.chromaticTuner.prepare();
+      }
+    } catch (error) {
+      console.error('Failed to start exercise', error);
+      this._tempo.stop();
+      this.tabsService.setDisabled(false);
     }
-    this.queueScaleContent();
+
+    this.cdr.markForCheck();
   }
 
   /**
@@ -705,12 +696,108 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /**
+   * Converts an app note name to frequency in Hz.
+   * Handles formats: C4, C4s, D4f, B3f, etc.
+   */
+  private noteNameToFrequency(noteName: string): number {
+    const match = noteName.match(/^([A-Ga-g])(#|s|b|f)?(\d+)$/);
+    if (!match) return 0;
+
+    const letter = match[1].toUpperCase();
+    const accidental = match[2];
+    const octave = parseInt(match[3], 10);
+
+    const semitoneMap: { [key: string]: number } = {
+      'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11
+    };
+
+    let semitone = semitoneMap[letter];
+    if (accidental === '#' || accidental === 's') semitone += 1;
+    if (accidental === 'b' || accidental === 'f') semitone -= 1;
+
+    const midi = (octave + 1) * 12 + semitone;
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  private startPitchFeedback() {
+    if (this.pitchSubscription) {
+      return;
+    }
+
+    this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
+      if (this.currentAction !== 'Play') {
+        return;
+      }
+
+      if (pitch <= 0 || this.currentNote < 0 || this.currentNote >= this.NOTES.length) {
+        this.setPitchFeedbackWaiting('Waiting');
+        return;
+      }
+
+      const targetNoteName = this.NOTES[this.currentNote][0];
+      const targetFreq = this.noteNameToFrequency(targetNoteName);
+      if (targetFreq <= 0) return;
+
+      const cents = 1200 * Math.log2(pitch / targetFreq);
+      this.pitchCents = cents;
+
+      // Map cents (-50 to +50) to bar position (0% to 100%)
+      const clampedCents = Math.max(-50, Math.min(50, cents));
+      this.pitchBarPosition = 50 + (clampedCents / 50) * 50;
+
+      if (cents >= -10 && cents <= 10) {
+        this.pitchAccuracyClass = 'in-tune';
+        this.pitchFeedbackLabel = 'In Tune';
+      } else if (cents >= -30 && cents <= 30) {
+        this.pitchAccuracyClass = 'close';
+        this.pitchFeedbackLabel = cents > 0 ? 'Sharp' : 'Flat';
+      } else {
+        this.pitchAccuracyClass = 'far';
+        this.pitchFeedbackLabel = cents > 0 ? 'Too Sharp' : 'Too Flat';
+      }
+    });
+  }
+
+  private stopPitchFeedback() {
+    this.pitchSubscription?.unsubscribe();
+    this.pitchSubscription = null;
+    this.resetPitchFeedback();
+  }
+
+  private setPitchFeedbackWaiting(label = 'Waiting') {
+    this.pitchCents = 0;
+    this.pitchAccuracyClass = 'waiting';
+    this.pitchFeedbackLabel = label;
+    this.pitchBarPosition = 50;
+  }
+
+  private resetPitchFeedback() {
+    this.setPitchFeedbackWaiting('Waiting');
+  }
+
+  private resetInstrumentVisual() {
+    if (this.selectedInstrument === 'trumpet') {
+      this.trumpetBtns = [];
+    } else if (this.selectedInstrument === 'clarinet') {
+      this.clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
+    } else if (this.selectedInstrument === 'oboe') {
+      this.oboePosition = 'assets/images/oboe_positions/A4.svg';
+    }
+  }
+
+  private teardownAfterExercise() {
+    this.stopPitchFeedback();
+    this.resetInstrumentVisual();
+    this.currentAction = '';
+  }
+
+  /**
    * Stops the tempo and all audio playback, and saves the stop event to Firebase.
    * @returns void
    */
   stop() {
     this._tempo.stop();
-    if (this.mode == 'tuner') {
+    if (this.mode == 'tuner' && this.chromaticTuner) {
       const meansArray = this.chromaticTuner.stop();
       if (meansArray.length > 0) {
         this.collectedMeansObject = {
@@ -720,11 +807,24 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       }
       console.log('Collected Means', this.collectedMeansObject);
     }
-    else if (this.mode == this.selectedInstrument) {
-      // this.pitchService.disconnect();
-    }
+
+    // Disconnect pitch feedback
+    this.pitchSubscription?.unsubscribe();
+    this.pitchSubscription = null;
+    this.pitchService.disconnect();
+    this.resetPitchFeedback();
+
+    this.teardownAfterExercise();
+
     Howler.stop();
     this.firebase.saveStop('interrupted', this.collectedMeansObject);
+    this.cdr.markForCheck();
+  }
+
+  /** Display name for the selected instrument (idle screen label). */
+  get selectedInstrumentDisplayName(): string {
+    return this.instrumentDisplayNames[this.selectedInstrument]
+      ?? this.selectedInstrument.charAt(0).toUpperCase() + this.selectedInstrument.slice(1);
   }
 
   /**
@@ -850,72 +950,13 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /**
-   * Scales the content of the page based on the viewport size.
-   * @returns void
-   */
-  scaleContent() {
-    const wrapper = document.getElementById('wrapper');
-    const host = document.getElementById('container');
-
-    if (!wrapper || !host) {
-      return;
-    }
-
-    wrapper.style.transform = 'scale(1)';
-    wrapper.style.left = '0px';
-    wrapper.style.top = '0px';
-
-    const baseWidth = Math.max(wrapper.scrollWidth, wrapper.offsetWidth);
-    const baseHeight = Math.max(wrapper.scrollHeight, wrapper.offsetHeight);
-    const hostRect = host.getBoundingClientRect();
-    const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-    const availableWidth = Math.max(0, Math.min(hostRect.width, viewportWidth));
-    const availableHeight = Math.max(0, Math.min(hostRect.height, viewportHeight));
-
-    if (!baseWidth || !baseHeight || !availableWidth || !availableHeight) {
-      return;
-    }
-
-    const scaleX = availableWidth / baseWidth;
-    const scaleY = availableHeight / baseHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
-
-    wrapper.style.transform = `scale(${scale})`;
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = `${Math.max((availableWidth - baseWidth * scale) / 2, 0)}px`;
-    wrapper.style.top = `${Math.max((availableHeight - baseHeight * scale) / 2, 0)}px`;
-  }
-
-  private queueScaleContent() {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => this.scaleContent());
-    });
-  }
-
-  /**
    * Lifecycle hook that is called after the view has been initialized.
    * @returns void
    */
   ngAfterViewInit() {
-    window.addEventListener('resize', this.boundScaleContent);
-    window.addEventListener('orientationchange', this.boundScaleContent);
-    window.visualViewport?.addEventListener('resize', this.boundScaleContent);
     window.addEventListener('mei-settings-updated', this.boundRefreshSettings);
-
-    const host = document.getElementById('container');
-    const wrapper = document.getElementById('wrapper');
-
-    if (typeof ResizeObserver !== 'undefined' && host && wrapper) {
-      this.resizeObserver = new ResizeObserver(() => this.scaleContent());
-      this.resizeObserver.observe(host);
-      this.resizeObserver.observe(wrapper);
-    }
-
-    this.queueScaleContent();
-    setTimeout(() => this.scaleContent(), 250);
-    setTimeout(() => this.scaleContent(), 800);
   }
+
   changeLanguage(event: any) {
     this.language = event.detail.value; // Update the language based on the selected value
     localStorage.setItem('language', this.language); // Optionally save the language to local storage
