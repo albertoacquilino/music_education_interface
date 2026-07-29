@@ -16,6 +16,11 @@ export interface ClockTick {
 
 export interface ClockPort {
   nowMs(): number;
+  after(
+    delayMs: number,
+    onElapsed: (observedAtMs: number) => void,
+    signal: AbortSignal
+  ): CancelHandle;
   every(
     periodMs: number,
     onTick: (tick: ClockTick) => void,
@@ -69,6 +74,7 @@ export interface PitchInputPort {
 
 export interface NotationPort {
   forPrepareListenPlay(target: NoteTarget, dynamic?: string): Score;
+  forTarget(target: NoteTarget): Score;
 }
 
 export interface ActivitySessionEnvelope {

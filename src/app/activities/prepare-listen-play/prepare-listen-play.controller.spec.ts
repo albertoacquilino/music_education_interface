@@ -21,6 +21,14 @@ class FakeClock implements ClockPort {
     return this.now;
   }
 
+  after(
+    _delayMs: number,
+    _onElapsed: (observedAtMs: number) => void,
+    _signal: AbortSignal
+  ) {
+    return { cancel: () => undefined };
+  }
+
   every(
     periodMs: number,
     onTick: (tick: ClockTick) => void,
@@ -104,7 +112,11 @@ describe('PrepareListenPlayController', () => {
       },
       notation: {
         forPrepareListenPlay: (target, dynamic) =>
-          scoreFromNote(target.displayToken, target.instrumentId, dynamic)
+          scoreFromNote(target.displayToken, target.instrumentId, dynamic),
+        forTarget: target => scoreFromNote(
+          target.displayToken,
+          target.instrumentId
+        )
       },
       instruments,
       persistence,

@@ -125,7 +125,74 @@ export type Activity = {
    * @type {{ [key: string]: number[] }}
    */
   collectedMeansObject?: { [key: string]: number[] }
+
+  /**
+   * Versioned bounded telemetry for activities using the shared lifecycle.
+   * Legacy PLP fields remain available for compatibility with existing data.
+   */
+  schemaVersion?: 2;
+  sessionId?: string;
+  activityId?: 'prepare-listen-play' | 'target-intonation';
+  activityVersion?: string;
+  instrumentId?: string;
+  configuration?: Record<string, unknown>;
+  sessionStartedAtMs?: number;
+  activityResult?: TypedActivityResult;
 };
+
+export interface TypedActivitySessionStart {
+  readonly schemaVersion: 2;
+  readonly sessionId: string;
+  readonly activityId: 'target-intonation';
+  readonly activityVersion: string;
+  readonly instrumentId: string;
+  readonly configuration: Record<string, unknown>;
+  readonly sessionStartedAtMs: number;
+}
+
+export interface PersistedIntonationAttempt {
+  readonly target: {
+    readonly instrumentId: string;
+    readonly noteId: string;
+    readonly noteIndex: number;
+    readonly writtenToken: string;
+    readonly soundingToken: string;
+    readonly displayToken: string;
+    readonly expectedSoundingFrequencyHz: number;
+    readonly referenceA4Hz: number;
+  };
+  readonly targetNumber: number;
+  readonly attemptIndex: number;
+  readonly outcome: 'stable-hold' | 'timeout' | 'skipped' | 'cancelled';
+  readonly startedAtMs: number;
+  readonly endedAtMs: number;
+  readonly timeToFirstValidEstimateMs?: number;
+  readonly timeToStableHoldMs?: number;
+  readonly validEstimateCount: number;
+  readonly wrongNoteCount: number;
+  readonly medianCents?: number;
+  readonly absoluteErrorP95Cents?: number;
+  readonly spreadCents?: number;
+}
+
+export interface TypedActivityResult {
+  readonly activityId: 'target-intonation';
+  readonly activityVersion: string;
+  readonly sessionId: string;
+  readonly outcome: 'completed' | 'cancelled' | 'failed';
+  readonly startedAtMs: number;
+  readonly endedAtMs: number;
+  readonly plannedTargets: number;
+  readonly completedTargets: number;
+  readonly successfulTargets: number;
+  readonly attempts: readonly PersistedIntonationAttempt[];
+  readonly cancelReason?: string;
+  readonly failure?: {
+    readonly code: string;
+    readonly message: string;
+    readonly recoverable: boolean;
+  };
+}
 
 /**
 * Represents a user in the application.
@@ -172,4 +239,3 @@ export type User = {
    */
   learningMode?: string;
 };
-

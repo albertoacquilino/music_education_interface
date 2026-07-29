@@ -13,6 +13,34 @@ export class RxjsClockAdapter implements ClockPort {
     return performance.now();
   }
 
+  after(
+    delayMs: number,
+    onElapsed: (observedAtMs: number) => void,
+    signal: AbortSignal
+  ): CancelHandle {
+    let cancelled = false;
+    const timerId = window.setTimeout(() => {
+      if (cancelled || signal.aborted) {
+        return;
+      }
+      cancelled = true;
+      signal.removeEventListener('abort', cancel);
+      onElapsed(this.nowMs());
+    }, delayMs);
+
+    const cancel = () => {
+      if (cancelled) {
+        return;
+      }
+      cancelled = true;
+      window.clearTimeout(timerId);
+      signal.removeEventListener('abort', cancel);
+    };
+
+    signal.addEventListener('abort', cancel, { once: true });
+    return { cancel };
+  }
+
   every(
     periodMs: number,
     onTick: (tick: ClockTick) => void,

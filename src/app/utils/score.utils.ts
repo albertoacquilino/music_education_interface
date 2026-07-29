@@ -87,3 +87,30 @@ export function scoreFromNote(meiNote: string, instrument: string, dynamic: stri
     }
     return score;
 }
+
+/**
+ * Creates the single-target notation used by event-driven intonation work.
+ * This intentionally differs from the three-measure PLP presentation.
+ */
+export function scoreForTarget(meiNote: string): Score {
+    const note = meiNote[0];
+    const octave = meiNote[1];
+    const accidental = meiNote.length === 3
+        ? (meiNote[2] === 's' ? '#' : 'b')
+        : '';
+
+    return {
+        clef: 'treble',
+        dynamicPosition: 0,
+        timeSignature: '4/4',
+        keySignature: 'C',
+        measures: [
+            [
+                {
+                    notes: [`${note}${accidental}/${Number(octave)}`],
+                    duration: 'w'
+                }
+            ]
+        ]
+    };
+}
