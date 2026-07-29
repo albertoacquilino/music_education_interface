@@ -2,7 +2,9 @@
 // https://karma-runner.github.io/1.0/config/configuration-file.html
 
 module.exports = function (config) {
-  const isCI = process.env.CI === 'true';
+  const isCI = process.env.CI === 'true'
+    || process.argv.includes('--no-watch')
+    || process.argv.includes('--watch=false');
 
   config.set({
     basePath: '',
@@ -21,7 +23,9 @@ module.exports = function (config) {
         // for example, you can disable the random execution with `random: false`
         // or set a specific seed with `seed: 4321`
       },
-      clearContext: false // leave Jasmine Spec Runner output visible in browser
+      // Clear the test iframe before single-run shutdown. Otherwise current
+      // Chrome fires Karma's beforeunload guard after success has been reported.
+      clearContext: isCI
     },
     jasmineHtmlReporter: {
       suppressAll: true // removes the duplicated traces
