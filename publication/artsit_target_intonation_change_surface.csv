@@ -1,0 +1,19 @@
+status,path,category,added_lines,deleted_lines,shared_file,classification_note
+added,src/app/activities/target-intonation/intonation-evaluator.ts,new target-intonation module,315,0,false,Pure target-relative evaluator
+added,src/app/activities/target-intonation/target-intonation.controller.ts,new target-intonation module,800,0,false,Event-driven activity controller
+added,src/app/activities/target-intonation/target-intonation.types.ts,new target-intonation module,182,0,false,Typed configuration states commands and results
+modified,src/app/core/activity/activity-context.ts,shared contract extension,6,0,true,One-shot clock and target notation capabilities
+modified,src/app/adapters/clock/rxjs-clock.adapter.ts,shared adapter reuse,28,0,true,One-shot timer implementation
+modified,src/app/adapters/notation/score-notation.adapter.ts,shared adapter reuse,5,1,true,Target notation implementation
+modified,src/app/adapters/persistence/firebase-activity.adapter.ts,shared adapter reuse,120,18,true,Typed bounded result dispatch at persistence boundary
+modified,src/app/models/firebase.types.ts,shared adapter reuse,67,1,true,Bounded target-intonation persistence DTOs
+modified,src/app/services/firebase.service.ts,shared adapter reuse,73,1,true,Offline-first typed activity storage reuse
+modified,src/app/utils/score.utils.ts,shared adapter reuse,27,0,true,Single-target score construction
+modified,src/app/app.routes.ts,host/routing/presentation integration,6,5,false,Independent activity route
+modified,src/app/components/chromatic-tuner/chromatic-tuner.component.ts,host/routing/presentation integration,54,2,false,Explicit-target gauge presentation
+modified,src/app/pages/home/home.page.ts,host/routing/presentation integration,5,3,false,PLP host fixed to its target-feedback mode
+modified,src/app/pages/tabs/tabs.page.html,host/routing/presentation integration,29,11,false,Two activity selectors
+modified,src/app/pages/tabs/tabs.page.ts,host/routing/presentation integration,38,9,false,Route selection and supersession
+added,src/app/pages/target-intonation/target-intonation.page.html,host/routing/presentation integration,122,0,false,Activity-specific view
+added,src/app/pages/target-intonation/target-intonation.page.scss,host/routing/presentation integration,213,0,false,Activity-specific responsive layout
+added,src/app/pages/target-intonation/target-intonation.page.ts,host/routing/presentation integration,397,0,false,Controller composition and snapshot mapping

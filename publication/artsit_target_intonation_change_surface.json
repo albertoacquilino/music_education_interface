@@ -1,0 +1,66 @@
+{
+  "comparisonPoint": "45daf1c",
+  "scope": "production changes from the post-PLP comparison point through f0ac951",
+  "production": {
+    "filesAdded": 6,
+    "filesModified": 12,
+    "linesAdded": 2487,
+    "linesDeleted": 51
+  },
+  "tests": {
+    "filesAdded": 6,
+    "filesModified": 2,
+    "linesAdded": 1399,
+    "linesDeleted": 1
+  },
+  "categoryTotals": [
+    {
+      "category": "new target-intonation module",
+      "files": 3,
+      "linesAdded": 1297,
+      "linesDeleted": 0
+    },
+    {
+      "category": "shared contract extension",
+      "files": 1,
+      "linesAdded": 6,
+      "linesDeleted": 0
+    },
+    {
+      "category": "shared adapter reuse",
+      "files": 6,
+      "linesAdded": 320,
+      "linesDeleted": 21
+    },
+    {
+      "category": "PLP modification",
+      "files": 0,
+      "linesAdded": 0,
+      "linesDeleted": 0
+    },
+    {
+      "category": "host/routing/presentation integration",
+      "files": 8,
+      "linesAdded": 864,
+      "linesDeleted": 30
+    },
+    {
+      "category": "unrelated correction",
+      "files": 0,
+      "linesAdded": 0,
+      "linesDeleted": 0
+    }
+  ],
+  "sharedFilesTouched": 7,
+  "plpControllerLogicChanged": false,
+  "plpControllerSha256AtComparisonPoint": "8fcdbe101780b7d6f8239b2216f74948d06281516919678fe64ac65b93a567b9",
+  "plpControllerSha256Current": "8fcdbe101780b7d6f8239b2216f74948d06281516919678fe64ac65b93a567b9",
+  "activitySpecificBranchesInsideSharedCore": false,
+  "activitySpecificDispatchAtPersistenceAdapterBoundary": true,
+  "notes": [
+    "The PLP controller source is byte-for-byte unchanged.",
+    "The PLP controller specification changed only to implement the two narrow shared port additions in its fake context.",
+    "Activity-specific persistence dispatch remains at the infrastructure adapter boundary and is not part of the shared lifecycle core.",
+    "Detailed per-file classifications are in artsit_target_intonation_change_surface.csv."
+  ]
+}
