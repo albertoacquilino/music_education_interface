@@ -19,6 +19,9 @@ import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { frequencyForMidi } from '../../core/music/pitch-math';
+import {
+    IntonationFeedback
+} from '../../activities/target-intonation/target-intonation.types';
 
 const MIN_CENTS = -40;
 const MAX_CENTS = 40;
@@ -51,13 +54,14 @@ export class ChromaticTunerComponent implements AfterViewInit, OnDestroy {
 
     private referenceA4Hz = 440;
     private currentPitchHz = 0;
+    private explicitTargetFeedback: IntonationFeedback | null = null;
     private readonly boundScaleContent = () => this.scaleContent();
 
     @Input() set refFrequencyValue$(value: number) {
         if (Number.isFinite(value) && value > 0) {
             this.referenceA4Hz = value;
             this.updateNotes();
-            this.displayPitch(this.currentPitchHz);
+            this.refreshDisplay();
         }
     }
 
@@ -67,7 +71,16 @@ export class ChromaticTunerComponent implements AfterViewInit, OnDestroy {
 
     @Input() set pitchHz(value: number) {
         this.currentPitchHz = Number.isFinite(value) && value > 0 ? value : 0;
-        this.displayPitch(this.currentPitchHz);
+        this.refreshDisplay();
+    }
+
+    @Input() set targetFeedback(value: IntonationFeedback | null) {
+        this.explicitTargetFeedback = value;
+        this.refreshDisplay();
+    }
+
+    get targetFeedback(): IntonationFeedback | null {
+        return this.explicitTargetFeedback;
     }
 
     pointerTransform = 'rotate(0deg)';
@@ -129,6 +142,37 @@ export class ChromaticTunerComponent implements AfterViewInit, OnDestroy {
         this.changeDetectorRef.markForCheck();
     }
 
+    displayTargetFeedback(feedback: IntonationFeedback): void {
+        const pitchHz = feedback.detectedFrequencyHz ?? 0;
+        if (!Number.isFinite(pitchHz) || pitchHz <= 0) {
+            this.resetDisplay();
+            return;
+        }
+
+        const midi = feedback.detectedSoundingMidi ?? Math.round(
+            69 + 12 * Math.log2(pitchHz / this.referenceA4Hz)
+        );
+        this.detectedPitch = pitchHz;
+        this.currentNote = this.noteNameForMidi(
+            Math.max(LOWEST_MIDI, Math.min(HIGHEST_MIDI, midi))
+        );
+        this.currentCents = feedback.centsFromTarget ?? 0;
+        this.rotatePointer(this.currentCents);
+
+        if (feedback.band === 'within-tolerance') {
+            this.currentEmoji = 'happy';
+        } else if (
+            feedback.band === 'flat'
+            || feedback.band === 'sharp'
+            || feedback.band === 'unstable'
+        ) {
+            this.currentEmoji = 'confused';
+        } else {
+            this.currentEmoji = 'notHappy';
+        }
+        this.changeDetectorRef.markForCheck();
+    }
+
     rotatePointer(cents: number): void {
         const clamped = Math.max(MIN_CENTS, Math.min(MAX_CENTS, cents));
         this.pointerTransform = `rotate(${9 * clamped / 4}deg)`;
@@ -150,6 +194,14 @@ export class ChromaticTunerComponent implements AfterViewInit, OnDestroy {
         // CSS owns sizing. Reading the instance-local element here preserves the
         // existing resize hook without introducing a global DOM identifier.
         void this.tunerSurface?.nativeElement.getBoundingClientRect();
+    }
+
+    private refreshDisplay(): void {
+        if (this.explicitTargetFeedback) {
+            this.displayTargetFeedback(this.explicitTargetFeedback);
+            return;
+        }
+        this.displayPitch(this.currentPitchHz);
     }
 
     private resetDisplay(): void {

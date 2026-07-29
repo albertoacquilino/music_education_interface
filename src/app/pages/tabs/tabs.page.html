@@ -48,10 +48,10 @@
                 [value]="exerciseMode"
               >
                 <ion-segment-button value="instrument">
-                  <ion-label>Instrument</ion-label>
+                  <ion-label>Prepare–Listen–Play</ion-label>
                 </ion-segment-button>
                 <ion-segment-button value="tuner">
-                  <ion-label>Tuner</ion-label>
+                  <ion-label>Target Intonation</ion-label>
                 </ion-segment-button>
               </ion-segment>
             </ion-item>
@@ -67,7 +67,7 @@
         </h3>
         <div class="section-card">
           <ion-list lines="none">
-            <ion-item [disabled]="isDisabled() || isInstrumentSelectDisabled()">
+            <ion-item [disabled]="isDisabled()">
               <ion-icon name="musical-notes" slot="start" class="item-icon" aria-hidden="true"></ion-icon>
               <ion-label>Select Instrument</ion-label>
               <ion-select
@@ -180,13 +180,24 @@
 
       <nav class="app-nav-tabs" aria-label="Sections">
         <button
-          class="app-nav-tab active"
+          class="app-nav-tab"
+          [class.active]="exerciseMode === 'instrument'"
           type="button"
-          [disabled]="isDisabled()"
-          aria-current="page"
+          [attr.aria-current]="exerciseMode === 'instrument' ? 'page' : null"
+          (click)="openActivity('instrument')"
         >
           <ion-icon name="musical-notes" aria-hidden="true"></ion-icon>
-          <span>Exercise</span>
+          <span>Prepare–Listen–Play</span>
+        </button>
+        <button
+          class="app-nav-tab"
+          [class.active]="exerciseMode === 'tuner'"
+          type="button"
+          [attr.aria-current]="exerciseMode === 'tuner' ? 'page' : null"
+          (click)="openActivity('tuner')"
+        >
+          <ion-icon name="pulse-outline" aria-hidden="true"></ion-icon>
+          <span>Target Intonation</span>
         </button>
       </nav>
 
@@ -233,12 +244,19 @@
       </ion-tab-button>
       <ion-tab-button
         tab="exercise"
-        href="/home/exercise"
-        [selected]="true"
-        [disabled]="isDisabled()"
+        [selected]="exerciseMode === 'instrument'"
+        (click)="openActivity('instrument')"
       >
         <ion-icon name="musical-notes"></ion-icon>
-        <ion-label>Exercise</ion-label>
+        <ion-label>PLP</ion-label>
+      </ion-tab-button>
+      <ion-tab-button
+        tab="intonation"
+        [selected]="exerciseMode === 'tuner'"
+        (click)="openActivity('tuner')"
+      >
+        <ion-icon name="pulse-outline"></ion-icon>
+        <ion-label>Intonation</ion-label>
       </ion-tab-button>
     </ion-tab-bar>
   </ion-tabs>

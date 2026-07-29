@@ -1,0 +1,122 @@
+<div class="ion-page" id="target-intonation-content">
+  <ion-content [fullscreen]="true">
+    <main class="intonation-page">
+      <header class="activity-header surface-panel">
+        <div>
+          <p class="eyebrow">Event-driven activity</p>
+          <h1>Target Intonation</h1>
+          <p>{{ selectedInstrumentName }} · A4 {{ referenceA4Hz }} Hz</p>
+        </div>
+        <div class="activity-progress" *ngIf="state">
+          Target {{ state.targetNumber }} of {{ state.targetCount }}
+          <span>Attempt {{ state.attemptIndex }} of {{ state.maximumAttempts }}</span>
+        </div>
+      </header>
+
+      <section class="start-panel surface-panel" *ngIf="!activityRunning && !activityStarting">
+        <div>
+          <h2>Match explicit written targets</h2>
+          <p>
+            Produce the sounding pitch for each written note and hold it
+            steadily inside the configured tolerance.
+          </p>
+        </div>
+        <ion-item lines="none">
+          <ion-label>Play reference tone</ion-label>
+          <ion-toggle
+            [(ngModel)]="playReferenceTone"
+            aria-label="Play reference tone"
+          ></ion-toggle>
+        </ion-item>
+        <p class="terminal-message" *ngIf="terminalMessage">{{ terminalMessage }}</p>
+        <ion-button expand="block" size="large" (click)="start()">
+          {{ terminalResult ? 'Restart activity' : 'Start activity' }}
+        </ion-button>
+      </section>
+
+      <section class="starting-panel surface-panel" *ngIf="activityStarting">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p>Opening pitch session…</p>
+      </section>
+
+      <ng-container *ngIf="activityRunning && state">
+        <section class="target-panel surface-panel" aria-label="Written target">
+          <div class="target-copy">
+            <p class="eyebrow">Written target</p>
+            <h2>{{ targetLabel() }}</h2>
+            <p *ngIf="state.kind === 'presenting-target'">
+              Reference tone:
+              {{ state.referencePlayback === 'playing' ? 'playing' :
+                 state.referencePlayback === 'failed' ? 'unavailable' : 'not requested' }}
+            </p>
+          </div>
+          <score-view
+            *ngIf="score"
+            [score]="score"
+            [language]="language"
+          ></score-view>
+        </section>
+
+        <section class="tracking-grid">
+          <div class="gauge-panel surface-panel" aria-label="Target-relative tuner">
+            <chromatic-tuner
+              [refFrequencyValue$]="referenceA4Hz"
+              [pitchHz]="detectedPitchHz"
+              [targetFeedback]="feedback"
+            ></chromatic-tuner>
+          </div>
+
+          <div class="feedback-panel surface-panel" aria-live="polite">
+            <p class="eyebrow">Detected pitch</p>
+            <h2>{{ detectedPitchLabel() }}</h2>
+            <p class="cents-reading">{{ centsLabel() }}</p>
+            <p class="feedback-label" [attr.data-band]="feedback?.band ?? 'presenting'">
+              {{ state.kind === 'presenting-target' ? 'Read and listen to the target' : feedbackLabel() }}
+            </p>
+
+            <div class="stability">
+              <div>
+                <span>Stable hold</span>
+                <span>{{ (stabilityProgress * 100) | number:'1.0-0' }}%</span>
+              </div>
+              <ion-progress-bar [value]="stabilityProgress"></ion-progress-bar>
+            </div>
+
+            <div class="attempt-result" *ngIf="state.kind === 'attempt-result'">
+              <strong>{{ attemptMessage() }}</strong>
+              <span>
+                {{ state.result.validEstimateCount }} valid estimates ·
+                {{ state.result.wrongNoteCount }} wrong-note estimates
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="activity-controls surface-panel" aria-label="Activity controls">
+          <ion-button
+            *ngIf="state.kind === 'attempt-result' && state.canRetry"
+            (click)="dispatch({ type: 'retry-attempt' })"
+          >
+            Retry
+          </ion-button>
+          <ion-button
+            *ngIf="state.kind === 'attempt-result' && state.canProceed"
+            (click)="dispatch({ type: 'next-target' })"
+          >
+            Next target
+          </ion-button>
+          <ion-button
+            color="medium"
+            *ngIf="state.kind !== 'attempt-result' || state.canSkip"
+            (click)="dispatch({ type: 'skip-target' })"
+          >
+            Skip target
+          </ion-button>
+          <ion-button color="danger" fill="outline" (click)="stop()">
+            Stop
+          </ion-button>
+        </section>
+      </ng-container>
+    </main>
+  </ion-content>
+</div>

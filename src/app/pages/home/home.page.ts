@@ -206,7 +206,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       cycles: MAXCYCLES,
       includeAccidentals: this.useFlatsAndSharps,
       useDynamics: this.useDynamics,
-      pitchDisplay: this.isTunerExercise() ? 'chromatic' : 'target',
+      pitchDisplay: 'target',
       referenceA4Hz: this.refFrequencyValue$
     };
 
@@ -358,8 +358,10 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private loadStateFromLocalStorage(): void {
-    const { mode, instrument } = this.parseStoredModeAndInstrument();
-    this.exerciseMode = mode;
+    const { instrument } = this.parseStoredModeAndInstrument();
+    // The exercise route is the PLP host. Target intonation now has its own
+    // controller and route instead of entering PLP's chromatic display mode.
+    this.exerciseMode = 'instrument';
     this.selectedInstrument = instrument;
     this.applyExerciseConfiguration();
     this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage(
