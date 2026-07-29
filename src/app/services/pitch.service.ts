@@ -13,7 +13,7 @@ import * as pitchlite from 'src/app/services/pitchlite';
 const workletChunkSize = 128;
 const bigWindow = 4096;
 const smallWindow = 512;
-const minPitch = 140; // lower pitch of mpm, 140 hz is close to trumpet
+export const PITCH_MINIMUM_HZ = 140; // lower pitch of mpm, 140 hz is close to trumpet
 const useYin = false; // use MPM by default
 
 /**
@@ -21,7 +21,7 @@ const useYin = false; // use MPM by default
  * @param array - The Float32Array to scale.
  * @returns A new Float32Array scaled to the range of -1 to 1.
  */
-function scaleArrayToMinusOneToOne(array: Float32Array) {
+export function scaleArrayToMinusOneToOne(array: Float32Array) {
     const maxAbsValue = Math.max(...array.map(Math.abs));
     return array.map((value) => value / maxAbsValue);
 }
@@ -133,7 +133,7 @@ export class PitchService {
             smallWindow,
             audioContext.sampleRate,
             useYin,
-            minPitch,
+            PITCH_MINIMUM_HZ,
         );
 
         this.ptr = this.wasmModule._malloc(bigWindow * Float32Array.BYTES_PER_ELEMENT);
