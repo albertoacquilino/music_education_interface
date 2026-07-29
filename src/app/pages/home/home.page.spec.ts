@@ -1,234 +1,226 @@
 import { ChangeDetectorRef, EventEmitter } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
-import { Howler } from 'howler';
-import { AppBeat } from 'src/app/models/appbeat.types';
-import { MAXCYCLES } from 'src/app/constants';
+import {
+  PrepareListenPlayController
+} from '../../activities/prepare-listen-play/prepare-listen-play.controller';
+import {
+  PrepareListenPlayResult,
+  PrepareListenPlayState
+} from '../../activities/prepare-listen-play/prepare-listen-play.types';
+import { ActivitySnapshot } from '../../core/activity/activity.types';
+import { InstrumentRegistryService } from '../../instruments/instrument-registry.service';
+import { ScoreNotationAdapter } from '../../adapters/notation/score-notation.adapter';
+import { BeatService } from '../../services/beat.service';
 import { HomePage } from './home.page';
 
-describe('HomePage current exercise orchestration', () => {
+describe('HomePage activity host', () => {
   let page: HomePage;
-  let beat: any;
+  let session: any;
   let sounds: any;
-  let firebase: any;
-  let refFrequency$: BehaviorSubject<number>;
-  let pitch$: BehaviorSubject<number>;
   let pitch: any;
+  let refFrequency$: BehaviorSubject<number>;
   let tabs: any;
   let cdr: jasmine.SpyObj<ChangeDetectorRef>;
-  let tuner: any;
+  let instruments: InstrumentRegistryService;
 
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
     jasmine.clock().install();
 
-    beat = {
-      tempo$: new BehaviorSubject<number>(80),
-      playing$: new BehaviorSubject<boolean>(false),
-      tick$: new EventEmitter<AppBeat>(),
-      start: jasmine.createSpy('start').and.callFake(() => beat.playing$.next(true)),
-      stop: jasmine.createSpy('stop').and.callFake(() => beat.playing$.next(false)),
-      setTempo: jasmine.createSpy('setTempo')
+    session = {
+      isActive: false,
+      start: jasmine.createSpy('start').and.callFake(async () => {
+        session.isActive = true;
+      }),
+      cancel: jasmine.createSpy('cancel').and.callFake(async () => {
+        session.isActive = false;
+        return null;
+      })
     };
     sounds = {
       loading$: new BehaviorSubject<boolean>(false),
-      currentNote: 0,
-      unlockAudio: jasmine.createSpy('unlockAudio').and.resolveTo(),
-      ensureSoundsReady: jasmine.createSpy('ensureSoundsReady').and.resolveTo(),
       setInstrument: jasmine.createSpy('setInstrument').and.resolveTo(),
-      setVolume: jasmine.createSpy('setVolume')
+      unlockFromUserGesture: jasmine.createSpy('unlock').and.resolveTo(),
+      preloadInstrument: jasmine.createSpy('preload').and.resolveTo(),
+      playMetronome: jasmine.createSpy('metronome'),
+      playReference: jasmine.createSpy('reference'),
+      stopAll: jasmine.createSpy('stopAll')
     };
-    firebase = jasmine.createSpyObj('FirebaseService', ['saveStart', 'saveStop']);
-    refFrequency$ = new BehaviorSubject<number>(440);
-    const refFrequencyService = {
-      getRefFrequency: jasmine.createSpy('getRefFrequency').and.returnValue(refFrequency$),
-      setRefFrequency: jasmine.createSpy('setRefFrequency')
-    };
-    pitch$ = new BehaviorSubject<number>(0);
     pitch = {
-      pitch$,
-      primeMicrophoneAccess: jasmine.createSpy('primeMicrophoneAccess').and.resolveTo(),
-      connect: jasmine.createSpy('connect').and.resolveTo(),
-      disconnect: jasmine.createSpy('disconnect')
+      estimates$: new BehaviorSubject({
+        kind: 'unvoiced',
+        reason: 'silence',
+        capturedAtMs: 0,
+        emittedAtMs: 0
+      }),
+      acquire: jasmine.createSpy('acquire')
+    };
+    refFrequency$ = new BehaviorSubject(440);
+    const refFrequency = {
+      getRefFrequency: jasmine.createSpy('getRefFrequency')
+        .and.returnValue(refFrequency$),
+      setRefFrequency: jasmine.createSpy('setRefFrequency')
     };
     tabs = jasmine.createSpyObj('TabsService', ['setDisabled']);
     cdr = jasmine.createSpyObj<ChangeDetectorRef>(
       'ChangeDetectorRef',
       ['markForCheck', 'detectChanges']
     );
-    tuner = {
-      prepare: jasmine.createSpy('prepare').and.resolveTo(),
-      startCapture: jasmine.createSpy('startCapture'),
-      stopCapture: jasmine.createSpy('stopCapture').and.returnValue([]),
-      stop: jasmine.createSpy('stop').and.returnValue([])
-    };
+    instruments = new InstrumentRegistryService();
 
     page = new HomePage(
       sounds,
       jasmine.createSpyObj('PickerController', ['create']),
-      beat,
-      firebase,
+      new BeatService(),
       jasmine.createSpyObj('AlertController', ['create']),
-      refFrequencyService as any,
+      refFrequency as any,
       tabs,
       pitch,
       jasmine.createSpyObj('Router', ['navigate']),
-      cdr
+      cdr,
+      session,
+      {
+        nowMs: () => 0,
+        every: jasmine.createSpy('every')
+      } as any,
+      instruments,
+      new ScoreNotationAdapter(),
+      {
+        open: jasmine.createSpy('open'),
+        close: jasmine.createSpy('close')
+      } as any
     );
-    (page as any).chromaticTuner = tuner;
-    page.refFrequencyValue$ = 440;
+    page.ngOnInit();
   });
 
   afterEach(() => {
     page.ngOnDestroy();
-    void page.audioContext.close();
     jasmine.clock().uninstall();
   });
 
-  it('starts instrument mode only after audio readiness and microphone connection', async () => {
-    const order: string[] = [];
-    sounds.unlockAudio.and.callFake(async () => { order.push('unlock'); });
-    sounds.ensureSoundsReady.and.callFake(async () => { order.push('sounds-ready'); });
-    pitch.primeMicrophoneAccess.and.callFake(async () => { order.push('mic-prime'); });
-    pitch.connect.and.callFake(async () => { order.push('mic-connect'); });
-    beat.start.and.callFake(() => {
-      order.push('beat-start');
-      beat.playing$.next(true);
-    });
-    firebase.saveStart.and.callFake(() => order.push('firebase-start'));
-
-    await page.startStop();
-
-    expect(order).toEqual([
-      'unlock',
-      'sounds-ready',
-      'mic-prime',
-      'mic-connect',
-      'beat-start',
-      'firebase-start'
-    ]);
-    expect(tabs.setDisabled).toHaveBeenCalledWith(true);
-    expect(firebase.saveStart).toHaveBeenCalledOnceWith(80, 13, 13, 440, false, false);
-  });
-
-  it('starts the tuner beat before awaiting tuner preparation and skips parent microphone setup', async () => {
-    const order: string[] = [];
-    page.exerciseMode = 'tuner';
-    beat.start.and.callFake(() => {
-      order.push('beat-start');
-      beat.playing$.next(true);
-    });
-    tuner.prepare.and.callFake(async () => { order.push('tuner-prepare'); });
-
-    await page.startStop();
-
-    expect(order).toEqual(['beat-start', 'tuner-prepare']);
-    expect(pitch.primeMicrophoneAccess).not.toHaveBeenCalled();
-    expect(pitch.connect).not.toHaveBeenCalled();
-  });
-
-  it('maps measure-zero/listen/play beat-zero events to Rest, Listen, and Play', () => {
-    spyOn(page, 'nextNote').and.returnValue(15);
-    const updateScore = spyOn(page, 'updateScore');
-    const updateTrumpet = spyOn(page, 'updateTrumpetPosition');
-
-    page.intervalHandler({ playing: true, measure: 0, beat: 0, cycle: 1 });
-    expect(page.currentAction).toBe('Rest');
-    expect(page.currentNote).toBe(15);
-    expect(sounds.currentNote).toBe(15);
-    expect(updateScore).toHaveBeenCalledOnceWith(15);
-    expect(updateTrumpet).toHaveBeenCalledOnceWith(15);
-
-    page.intervalHandler({ playing: true, measure: 1, beat: 0, cycle: 1 });
-    expect(page.currentAction).toBe('Listen');
-    expect(page.pitchFeedbackLabel).toBe('Listen');
-
-    page.intervalHandler({ playing: true, measure: 2, beat: 0, cycle: 1 });
-    expect(page.currentAction).toBe('Play');
-    pitch$.next(440);
-    expect(page.pitchFeedbackLabel).toBe('In Tune');
-
-    page.intervalHandler({ playing: true, measure: 0, beat: 0, cycle: 2 });
-    expect(page.pitchFeedbackLabel).toBe('Waiting');
-    expect((page as any).pitchSubscription.closed).toBeFalse();
-  });
-
-  it('opens and closes tuner collection in Play and Rest and records returned means', () => {
-    page.exerciseMode = 'tuner';
-    tuner.stopCapture.and.returnValue([439, 440]);
-
-    page.intervalHandler({ playing: true, measure: 2, beat: 0, cycle: 1 });
-    expect(tuner.startCapture).toHaveBeenCalledTimes(1);
-
-    page.intervalHandler({ playing: true, measure: 0, beat: 0, cycle: 2 });
-    expect(tuner.stopCapture).toHaveBeenCalledTimes(1);
-    expect(page.collectedMeansObject).toEqual({ 1: [439, 440] });
-  });
-
-  it('persists completion once for each duplicate terminal BeatService event', () => {
-    const terminal = { playing: false, measure: 0, beat: 0, cycle: MAXCYCLES };
-
-    page.intervalHandler(terminal);
-    page.intervalHandler({ ...terminal, playing: true });
-
-    expect(firebase.saveStop).toHaveBeenCalledTimes(2);
-    expect(firebase.saveStop).toHaveBeenCalledWith('finished', {});
-    expect(tabs.setDisabled).toHaveBeenCalledWith(false);
-    expect(page.currentAction).toBe('');
-  });
-
-  it('can move an accidental-only selected range outside that range', () => {
-    page.lowNote = 7;
-    page.highNote = 7;
-    page.useFlatsAndSharps = false;
-
-    expect(page.nextNote()).toBe(8);
-  });
-
-  it('uses fixed A4=440 written-note frequency with no instrument transposition', () => {
-    const noteNameToFrequency = (page as any).noteNameToFrequency.bind(page);
-
-    expect(noteNameToFrequency('A4')).toBe(440);
-    expect(noteNameToFrequency('C4')).toBeCloseTo(261.625565, 5);
+  it('starts by composing a typed controller configuration rather than orchestrating resources', async () => {
     page.selectedInstrument = 'clarinet';
-    expect(noteNameToFrequency('A4')).toBe(440);
-    page.refFrequencyValue$ = 442;
-    expect(noteNameToFrequency('A4')).toBe(440);
+    (page as any).applyExerciseConfiguration();
+    page.lowNote = 17;
+    page.highNote = 19;
+    page.refFrequencyValue$ = 450;
+
+    await page.startStop();
+
+    expect(session.start).toHaveBeenCalledTimes(1);
+    const [controller, config, context] = session.start.calls.mostRecent().args;
+    expect(controller instanceof PrepareListenPlayController).toBeTrue();
+    expect(config).toEqual(jasmine.objectContaining({
+      instrumentId: 'clarinet-bb',
+      lowNoteIndex: 17,
+      highNoteIndex: 19,
+      beatsPerPhase: 4,
+      cycles: 12,
+      referenceA4Hz: 450,
+      pitchDisplay: 'target'
+    }));
+    expect(context.audio).toBe(sounds);
+    expect(context.pitch).toBe(pitch);
+    expect(sounds.unlockFromUserGesture).not.toHaveBeenCalled();
+    expect(pitch.acquire).not.toHaveBeenCalled();
+    expect(tabs.setDisabled).toHaveBeenCalledWith(true);
   });
 
-  it('stops audio, pitch, tempo, persistence, and tuner collection on manual stop', () => {
-    const howlerStop = spyOn(Howler, 'stop');
-    page.exerciseMode = 'tuner';
-    tuner.stop.and.returnValue([440]);
-    beat.playing$.next(true);
-
-    page.stop();
-
-    expect(beat.stop).toHaveBeenCalled();
-    expect(tuner.stop).toHaveBeenCalled();
-    expect(pitch.disconnect).toHaveBeenCalled();
-    expect(howlerStop).toHaveBeenCalled();
-    expect(firebase.saveStop).toHaveBeenCalledOnceWith(
-      'interrupted',
-      { 1: [440] }
+  it('renders typed controller snapshots without deciding phase transitions', () => {
+    const controller = (page as any).controller as PrepareListenPlayController;
+    const instrument = instruments.get('trumpet-bb');
+    const target = instruments.resolveTarget(
+      instrument.id,
+      instrument.notes[13].id,
+      440
     );
+    const score = new ScoreNotationAdapter().forPrepareListenPlay(target);
+    const state: PrepareListenPlayState = {
+      phase: 'preparing',
+      cycleNumber: 1,
+      beatIndex: 0,
+      target,
+      score,
+      dynamicGain: 1
+    };
+
+    controller.snapshot$.next({
+      lifecycle: 'running',
+      sessionId: 'test',
+      state
+    });
+
+    expect(page.currentAction).toBe('Rest');
+    expect(page.currentBeat).toBe(0);
+    expect(page.currentNote).toBe(13);
+    expect(page.trumpetBtns).toEqual([]);
+
+    controller.snapshot$.next({
+      lifecycle: 'running',
+      sessionId: 'test',
+      state: {
+        ...state,
+        phase: 'playing',
+        pitchFeedback: {
+          kind: 'voiced',
+          frequencyHz: target.expectedSoundingFrequencyHz,
+          cents: 0,
+          band: 'in-tune'
+        }
+      }
+    });
+    expect(page.currentAction).toBe('Play');
+    expect(page.pitchFeedbackLabel).toBe('In Tune');
   });
 
-  it('cleans the beat subscription but leaves reference and one-second subscriptions active', () => {
-    const intervalHandler = spyOn(page, 'intervalHandler');
-    const checkMuted = spyOn(page, 'checkMuted').and.resolveTo();
-    page.ngOnInit();
+  it('handles one terminal result as view cleanup without closing persistence itself', () => {
+    const controller = (page as any).controller as PrepareListenPlayController;
+    const result: PrepareListenPlayResult = {
+      activityId: 'prepare-listen-play',
+      activityVersion: '1.0.0',
+      sessionId: 'test',
+      outcome: 'completed',
+      startedAtMs: 0,
+      endedAtMs: 1,
+      plannedCycles: 12,
+      completedCycles: 12,
+      presentedTargetIds: [],
+      collectedMeans: { 1: [440] }
+    };
 
-    jasmine.clock().tick(1000);
-    expect(checkMuted).toHaveBeenCalledTimes(1);
+    controller.snapshot$.next({
+      lifecycle: 'completed',
+      sessionId: 'test',
+      result
+    });
+
+    expect(page.collectedMeansObject).toEqual({ 1: [440] });
+    expect(tabs.setDisabled).toHaveBeenCalledOnceWith(false);
+    expect(page.currentAction).toBe('');
+    expect((page as any).persistence.close).not.toHaveBeenCalled();
+  });
+
+  it('delegates learner stop and navigation cancellation to the session boundary', async () => {
+    session.isActive = true;
+    await page.startStop();
+    expect(session.cancel).toHaveBeenCalledWith('learner-stop');
+
+    page.ionViewWillLeave();
+    expect(session.cancel).toHaveBeenCalledWith('navigation');
+  });
+
+  it('releases reference-frequency, timer, and controller subscriptions on destroy', () => {
+    const checkMuted = spyOn(page, 'checkMuted').and.resolveTo();
+    const controller = (page as any).controller as PrepareListenPlayController;
+    const beforeDestroyFrequency = page.refFrequencyValue$;
 
     page.ngOnDestroy();
-    beat.tick$.emit({ playing: true, measure: 0, beat: 0, cycle: 1 });
-    refFrequency$.next(442);
+    refFrequency$.next(450);
     jasmine.clock().tick(1000);
+    controller.snapshot$.next({ lifecycle: 'idle' });
 
-    expect(intervalHandler).not.toHaveBeenCalled();
-    expect(page.refFrequencyValue$).toBe(442);
-    expect(checkMuted).toHaveBeenCalledTimes(2);
+    expect(page.refFrequencyValue$).toBe(beforeDestroyFrequency);
+    expect(checkMuted).not.toHaveBeenCalled();
   });
 });

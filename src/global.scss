@@ -740,7 +740,7 @@ body.dark-theme {
   }
 
   //OVERRIDE: Main Score Area (Background Black, VexFlow Notes White)
-  score-view div#score {
+  score-view .score-surface {
     background-color: #000000 !important;
   }
 

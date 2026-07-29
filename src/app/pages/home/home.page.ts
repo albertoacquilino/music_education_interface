@@ -5,31 +5,68 @@
  * Licensed under the GNU Affero General Public License v3.0.
  * See the LICENSE file for more details.
  */
-import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { AlertController, IonicModule, PickerController } from '@ionic/angular';
+
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  OnDestroy,
+  OnInit
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Mute } from '@capgo/capacitor-mute';
-import { Howler } from 'howler';
+import { AlertController, IonicModule, PickerController } from '@ionic/angular';
 import { range } from 'lodash';
-import { Observable, Subscription, interval, tap } from 'rxjs';
-import { ChromaticTunerComponent } from 'src/app/components/chromatic-tuner/chromatic-tuner.component';
-import { NoteSelectorComponent } from 'src/app/components/note-selector/note-selector.component';
-import { ScoreViewComponent } from 'src/app/components/score/score.component';
-import { SemaphoreLightComponent } from 'src/app/components/semaphore-light/semaphore-light.component';
-import { TempoSelectorComponent } from 'src/app/components/tempo-selector/tempo-selector.component';
-import { TrumpetDiagramComponent } from 'src/app/components/trumpet-diagram/trumpet-diagram.component';
-import { AppBeat } from 'src/app/models/appbeat.types';
-import { Score } from 'src/app/models/score.types';
-import { FirebaseService } from 'src/app/services/firebase.service';
-import { PitchService } from 'src/app/services/pitch.service';
-import { RefFreqService } from 'src/app/services/ref-freq.service';
-import { SoundsService } from 'src/app/services/sounds.service';
-import { TabsService } from 'src/app/services/tabs.service';
-import { scoreFromNote } from 'src/app/utils/score.utils';
-import { DYNAMICS, INITIAL_NOTE, MAXCYCLES, MAXREFFREQUENCY, MAXTEMPO, MINREFFREQUENCY, MINTEMPO, TRUMPET_NOTES, CLARINET_NOTES, POSITIONS, TRUMPET_BTN, CLARINET_POSITIONS,OBOE_NOTES,OBOE_POSITIONS} from '../../constants';
+import { Observable, Subscription, interval } from 'rxjs';
+import {
+  PrepareListenPlayController
+} from '../../activities/prepare-listen-play/prepare-listen-play.controller';
+import {
+  PrepareListenPlayConfig,
+  PrepareListenPlayResult,
+  PrepareListenPlayState
+} from '../../activities/prepare-listen-play/prepare-listen-play.types';
+import { RxjsClockAdapter } from '../../adapters/clock/rxjs-clock.adapter';
+import {
+  FirebaseActivityAdapter
+} from '../../adapters/persistence/firebase-activity.adapter';
+import { ScoreNotationAdapter } from '../../adapters/notation/score-notation.adapter';
+import { ChromaticTunerComponent } from '../../components/chromatic-tuner/chromatic-tuner.component';
+import { NoteSelectorComponent } from '../../components/note-selector/note-selector.component';
+import { ScoreViewComponent } from '../../components/score/score.component';
+import { SemaphoreLightComponent } from '../../components/semaphore-light/semaphore-light.component';
+import { TempoSelectorComponent } from '../../components/tempo-selector/tempo-selector.component';
+import { TrumpetDiagramComponent } from '../../components/trumpet-diagram/trumpet-diagram.component';
+import {
+  DYNAMICS,
+  INITIAL_NOTE,
+  MAXCYCLES,
+  MAXREFFREQUENCY,
+  MAXTEMPO,
+  MINREFFREQUENCY,
+  MINTEMPO
+} from '../../constants';
+import { ActivityContext } from '../../core/activity/activity-context';
+import { ActivitySnapshot } from '../../core/activity/activity.types';
+import {
+  LegacyInstrumentId,
+  NoteTarget
+} from '../../instruments/instrument-definition';
+import {
+  InstrumentRegistryService
+} from '../../instruments/instrument-registry.service';
+import { Score } from '../../models/score.types';
 import { BeatService } from '../../services/beat.service';
+import { PitchService } from '../../services/pitch.service';
+import { RefFreqService } from '../../services/ref-freq.service';
+import { SoundsService } from '../../services/sounds.service';
+import { TabsService } from '../../services/tabs.service';
+import {
+  ActivitySessionService
+} from '../../core/activity/activity-session.service';
+import { scoreFromNote } from '../../utils/score.utils';
 
 @Component({
   selector: 'app-home',
@@ -39,433 +76,429 @@ import { BeatService } from '../../services/beat.service';
   imports: [
     IonicModule,
     ScoreViewComponent,
-    CommonModule, SemaphoreLightComponent,
-    TrumpetDiagramComponent, TempoSelectorComponent, NoteSelectorComponent,
-    ChromaticTunerComponent],
+    CommonModule,
+    SemaphoreLightComponent,
+    TrumpetDiagramComponent,
+    TempoSelectorComponent,
+    NoteSelectorComponent,
+    ChromaticTunerComponent
+  ]
 })
-/**
- * HomePage class represents the home page of the music education interface.
- */
 export class HomePage implements OnInit, AfterViewInit, OnDestroy {
-  @ViewChild(ChromaticTunerComponent) private chromaticTuner!: ChromaticTunerComponent;
+  private readonly controller = new PrepareListenPlayController();
+  private readonly subscriptions = new Subscription();
   private readonly boundRefreshSettings = () => this.handleSettingsUpdated();
-  private beatSubscription?: Subscription;
 
   exerciseMode: 'instrument' | 'tuner' = 'instrument';
-  selectedInstrument = 'trumpet';
-  private readonly instrumentDisplayNames: Record<string, string> = {
-    trumpet: 'Trumpet',
-    clarinet: 'Clarinet',
-    oboe: 'Oboe',
-  };
-  language: string = 'en'; // Default language
-  /**
-   * Array of notes corresponding to the selected instrument.
-   */
-  NOTES: string[][] = TRUMPET_NOTES;
-
-  /**
-   * Indicates whether the mute alert has been triggered.
-   */
+  selectedInstrument: LegacyInstrumentId = 'trumpet';
+  language = 'en';
+  NOTES: string[][] = [];
   muteAlert = false;
-
-  /**
-   * Indicates whether to use flats and sharps.
-   */
   useFlatsAndSharps = false;
-
-  /**
-   * Indicates whether dynamics are enabled.
-   */
   useDynamics = false;
-  
-  /**
-   * Indicates whether dark mode is enabled.
-   */
   isDarkMode = false;
-
-  // Shared CSS hook so options-menu selects can be themed in light and dark mode.
   instrumentSelectInterfaceOptions = { cssClass: 'settings-select-overlay' };
   nomenclatureSelectInterfaceOptions = { cssClass: 'settings-select-overlay' };
-  
-  /**
-   * The audio context used for playing sounds.
-   */
-  audioContext = new AudioContext();
-
-  /**
-   * The FontAwesome icon for a circle chevron down.
-   */
-  /**
-   * The observable for the tempo.
-   */
-  tempo$ = this._tempo.tempo$;
-  soundsLoading$ = this.soundsService.loading$;
-
-  /**
-   * The high note.
-   */
+  tempo$: Observable<number>;
+  soundsLoading$: Observable<boolean>;
   highNote = INITIAL_NOTE;
-
-  /**
-   * The low note.
-   */
   lowNote = INITIAL_NOTE;
-
-  /**
-   * The current note.
-   */
-  currentNote: number = INITIAL_NOTE;
-
-  /**
-   * The score.
-   */
-  score: Score = scoreFromNote(this.NOTES[this.currentNote][0], 'trumpet');
-
-  /**
-   * The audio nodes.
-   */
-  audioNodes = {};
-
-  /**
-   * The current action.
-   */
+  currentNote = INITIAL_NOTE;
+  score: Score = scoreFromNote('G4', 'trumpet');
   currentAction = '';
-
-  clarinetPosition = "assets/images/clarinet_positions/A3.svg";
-  oboePosition = "assets/images/oboe_positions/A4.svg";
-
-  /**
-   * The trumpet buttons to highlight for each note.
-   */
+  currentBeat = -1;
+  clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
+  oboePosition = 'assets/images/oboe_positions/A4.svg';
   trumpetBtns: number[] = [];
-
-  /**
-   * The observable for the beat.
-   */
-  beat$!: Observable<AppBeat>;
-
-  /**
-   * The observable for playing state.
-   */
-  playing$!: Observable<boolean>;
-
-  /**
-   * The observable for the reference frequency.
-   */
-  refFrequencyValue$!: number;
-
+  refFrequencyValue$ = 440;
   showIOSWebAudioHint = false;
-
-  // Pitch feedback during exercise
   pitchCents = 0;
   pitchAccuracyClass: 'in-tune' | 'close' | 'far' | 'waiting' = 'waiting';
   pitchFeedbackLabel = 'Waiting';
   pitchBarPosition = 50;
-  private pitchSubscription: Subscription | null = null;
-
-  /**
-   * An object to collect all the notes played.
-   */
+  tunerPitchHz = 0;
   collectedMeansObject: { [key: string]: number[] } = {};
 
-  /**
-   * Creates an instance of HomePage.
-   * @param _picker - The picker controller.
-   * @param _tempo - The beat service.
-   * @param _sounds - The sounds service.
-   * @param firebase - The Firebase service.
-   * @param alertController - The alert controller.
-   * @param refFrequencyService - The Reference Frequency Service.
-   */
+  private readonly instrumentDisplayNames: Record<LegacyInstrumentId, string> = {
+    trumpet: 'Trumpet',
+    clarinet: 'Clarinet',
+    oboe: 'Oboe'
+  };
+
   constructor(
-    private soundsService: SoundsService,
-    private _picker: PickerController,
-    private _tempo: BeatService,
-    public firebase: FirebaseService,
-    private alertController: AlertController,
-    private refFrequencyService: RefFreqService,
-    private tabsService: TabsService,
-    private pitchService: PitchService,
-    private router: Router,
-    private cdr: ChangeDetectorRef,
+    private readonly soundsService: SoundsService,
+    private readonly picker: PickerController,
+    private readonly tempoSettings: BeatService,
+    private readonly alertController: AlertController,
+    private readonly refFrequencyService: RefFreqService,
+    private readonly tabsService: TabsService,
+    private readonly pitchService: PitchService,
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly activitySession: ActivitySessionService,
+    private readonly clock: RxjsClockAdapter,
+    private readonly instruments: InstrumentRegistryService,
+    private readonly notation: ScoreNotationAdapter,
+    private readonly persistence: FirebaseActivityAdapter
   ) {
-    this.NOTES = this.getNotesForInstrument(this.selectedInstrument);
-  
-    this.beat$ = this._tempo.tick$.pipe(
-      tap((tempo: AppBeat) => this.intervalHandler(tempo))
-    );
-    this.playing$ = this._tempo.playing$.asObservable();
-
-    interval(1000).subscribe(async () => this.checkMuted());
+    this.tempo$ = this.tempoSettings.tempo$.asObservable();
+    this.soundsLoading$ = this.soundsService.loading$;
   }
 
-  /**
-   * Retrieves the notes for the selected instrument.
-   * @param instrument - The instrument to get notes for.
-   * @returns An array of notes for the specified instrument.
-   */
-  private getNotesForInstrument(instrument: string | null): string[][] {
-    if (instrument === 'trumpet') {
-      return TRUMPET_NOTES; // Use trumpet notes
-    } else if (instrument === 'clarinet') {
-      return CLARINET_NOTES; // Use clarinet notes
-    } else if (instrument === 'oboe') {
-      return OBOE_NOTES;
-    }
-    return [];
-  }
-
-  /**
-   * Lifecycle hook that is called after the component has been initialized.
-   */
   ngOnInit(): void {
-    console.log(localStorage.getItem('LoggedInUser '));
-    this.refFrequencyService.getRefFrequency().subscribe(value => {
-      this.refFrequencyValue$ = value;
-    });
+    this.subscriptions.add(
+      this.refFrequencyService.getRefFrequency().subscribe(value => {
+        this.refFrequencyValue$ = value;
+      })
+    );
+    this.subscriptions.add(
+      this.controller.snapshot$.subscribe(snapshot => {
+        this.handleActivitySnapshot(snapshot);
+      })
+    );
+    this.subscriptions.add(
+      interval(1000).subscribe(() => {
+        void this.checkMuted();
+      })
+    );
+
     this.showIOSWebAudioHint = this.isIOSWebBrowser()
       && sessionStorage.getItem('ios-web-audio-hint-dismissed') !== 'true';
     this.loadStateFromLocalStorage();
-    this.beatSubscription = this.beat$.subscribe();
   }
 
   ngOnDestroy(): void {
     window.removeEventListener('mei-settings-updated', this.boundRefreshSettings);
-    this.beatSubscription?.unsubscribe();
+    this.subscriptions.unsubscribe();
+    void this.activitySession.cancel('navigation');
   }
 
-  /**
-   * Loads the state from local storage.
-   * @returns void
-   */
-  private loadStateFromLocalStorage() {
-    const { mode, instrument } = this.parseStoredModeAndInstrument();
-    const savedLanguage = localStorage.getItem('language');
+  ngAfterViewInit(): void {
+    window.addEventListener('mei-settings-updated', this.boundRefreshSettings);
+  }
 
+  ionViewWillLeave(): void {
+    void this.activitySession.cancel('navigation');
+  }
+
+  async startStop(): Promise<void> {
+    if (this.activitySession.isActive) {
+      await this.stop();
+      return;
+    }
+
+    const instrument = this.instruments.fromLegacyId(this.selectedInstrument);
+    const lowNote = instrument.notes[this.lowNote];
+    const highNote = instrument.notes[this.highNote];
+    if (!lowNote || !highNote) {
+      console.error('The selected note range is outside the instrument definition');
+      return;
+    }
+
+    const config: PrepareListenPlayConfig = {
+      instrumentId: instrument.id,
+      lowNoteId: lowNote.id,
+      highNoteId: highNote.id,
+      lowNoteIndex: this.lowNote,
+      highNoteIndex: this.highNote,
+      tempoBpm: this.tempoSettings.tempo$.value,
+      beatsPerPhase: 4,
+      cycles: MAXCYCLES,
+      includeAccidentals: this.useFlatsAndSharps,
+      useDynamics: this.useDynamics,
+      pitchDisplay: this.isTunerExercise() ? 'chromatic' : 'target',
+      referenceA4Hz: this.refFrequencyValue$
+    };
+
+    this.collectedMeansObject = {};
+    await this.activitySession.start(
+      this.controller,
+      config,
+      this.createActivityContext()
+    );
+    this.tabsService.setDisabled(this.activitySession.isActive);
+    this.cdr.markForCheck();
+  }
+
+  async stop(): Promise<void> {
+    await this.activitySession.cancel('learner-stop');
+    this.tabsService.setDisabled(false);
+    this.resetExerciseView();
+    this.cdr.markForCheck();
+  }
+
+  isPlaying(): boolean {
+    return this.activitySession.isActive;
+  }
+
+  private createActivityContext(): ActivityContext {
+    return {
+      clock: this.clock,
+      audio: this.soundsService,
+      pitch: this.pitchService,
+      notation: this.notation,
+      instruments: this.instruments,
+      persistence: this.persistence,
+      random: Math.random
+    };
+  }
+
+  private handleActivitySnapshot(
+    snapshot: ActivitySnapshot<PrepareListenPlayState, PrepareListenPlayResult>
+  ): void {
+    if (snapshot.lifecycle === 'running') {
+      this.renderRunningState(snapshot.state);
+      return;
+    }
+
+    if (
+      snapshot.lifecycle === 'completed'
+      || snapshot.lifecycle === 'cancelled'
+      || snapshot.lifecycle === 'failed'
+    ) {
+      this.collectedMeansObject = Object.keys(snapshot.result.collectedMeans)
+        .reduce<{ [key: string]: number[] }>((means, key) => ({
+          ...means,
+          [key]: [...snapshot.result.collectedMeans[key]]
+        }), {});
+      this.tabsService.setDisabled(false);
+      this.resetExerciseView();
+      this.cdr.markForCheck();
+    }
+  }
+
+  private renderRunningState(state: PrepareListenPlayState): void {
+    this.currentAction = state.phase === 'preparing'
+      ? 'Rest'
+      : state.phase === 'listening'
+        ? 'Listen'
+        : 'Play';
+    this.currentBeat = state.beatIndex;
+
+    if (state.target.noteIndex !== this.currentNote || state.beatIndex === 0) {
+      this.currentNote = state.target.noteIndex;
+      this.score = state.score;
+      this.renderFingering(state.target);
+    }
+
+    if (this.isTunerExercise()) {
+      this.tunerPitchHz = state.phase === 'playing'
+        ? state.chromaticPitchHz ?? 0
+        : 0;
+    } else if (state.phase === 'listening') {
+      this.setPitchFeedbackWaiting('Listen');
+    } else if (state.phase === 'preparing' || !state.pitchFeedback) {
+      this.setPitchFeedbackWaiting('Waiting');
+    } else if (state.pitchFeedback.kind === 'unvoiced') {
+      this.setPitchFeedbackWaiting('Waiting');
+    } else {
+      this.renderPitchFeedback(
+        state.pitchFeedback.cents,
+        state.pitchFeedback.band
+      );
+    }
+
+    this.cdr.markForCheck();
+  }
+
+  private renderFingering(target: NoteTarget): void {
+    if (target.fingering.kind === 'valves') {
+      this.trumpetBtns = [
+        ...(target.fingering.thirdValveSlide === 'extend' ? [0] : []),
+        ...target.fingering.pressedValveNumbers
+      ];
+      return;
+    }
+
+    if (target.instrumentId === 'clarinet-bb') {
+      this.clarinetPosition = target.fingering.assetPath;
+    } else if (target.instrumentId === 'oboe-c') {
+      this.oboePosition = target.fingering.assetPath;
+    }
+  }
+
+  private renderPitchFeedback(
+    cents: number,
+    band: 'in-tune' | 'close' | 'far'
+  ): void {
+    this.pitchCents = cents;
+    const clampedCents = Math.max(-50, Math.min(50, cents));
+    this.pitchBarPosition = 50 + clampedCents;
+    this.pitchAccuracyClass = band;
+    this.pitchFeedbackLabel = band === 'in-tune'
+      ? 'In Tune'
+      : cents > 0
+        ? band === 'close' ? 'Sharp' : 'Too Sharp'
+        : band === 'close' ? 'Flat' : 'Too Flat';
+  }
+
+  private resetExerciseView(): void {
+    this.currentAction = '';
+    this.currentBeat = -1;
+    this.tunerPitchHz = 0;
+    this.resetPitchFeedback();
+    this.resetInstrumentVisual();
+  }
+
+  private setPitchFeedbackWaiting(label: string): void {
+    this.pitchCents = 0;
+    this.pitchAccuracyClass = 'waiting';
+    this.pitchFeedbackLabel = label;
+    this.pitchBarPosition = 50;
+  }
+
+  private resetPitchFeedback(): void {
+    this.setPitchFeedbackWaiting('Waiting');
+  }
+
+  private resetInstrumentVisual(): void {
+    this.trumpetBtns = [];
+    this.clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
+    this.oboePosition = 'assets/images/oboe_positions/A4.svg';
+  }
+
+  private loadStateFromLocalStorage(): void {
+    const { mode, instrument } = this.parseStoredModeAndInstrument();
     this.exerciseMode = mode;
     this.selectedInstrument = instrument;
     this.applyExerciseConfiguration();
-
-    // Load common settings
-    this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage('useFlatsAndSharps', false);
+    this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage(
+      'useFlatsAndSharps',
+      false
+    );
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
-    this.language = savedLanguage ?? 'en';
-    // dark mode state load & apply
+    this.language = localStorage.getItem('language') ?? 'en';
     this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
     this.applyDarkMode(this.isDarkMode);
   }
 
-  private parseStoredModeAndInstrument(): { mode: 'instrument' | 'tuner'; instrument: string } {
+  private parseStoredModeAndInstrument(): {
+    mode: 'instrument' | 'tuner';
+    instrument: LegacyInstrumentId;
+  } {
     const savedMode = localStorage.getItem('mode');
     const savedInstrument = localStorage.getItem('selectedInstrument');
-    const instruments = ['trumpet', 'clarinet', 'oboe'] as const;
+    const isInstrument = (value: string | null): value is LegacyInstrumentId =>
+      value === 'trumpet' || value === 'clarinet' || value === 'oboe';
 
     let mode: 'instrument' | 'tuner' = 'instrument';
-    let instrument = 'trumpet';
-
-    if (savedInstrument && savedInstrument !== 'tuner' && instruments.includes(savedInstrument as typeof instruments[number])) {
+    let instrument: LegacyInstrumentId = 'trumpet';
+    if (isInstrument(savedInstrument)) {
       instrument = savedInstrument;
     }
-
-    if (savedMode === 'tuner') {
+    if (savedMode === 'tuner' || savedInstrument === 'tuner') {
       mode = 'tuner';
-    } else if (savedMode === 'instrument') {
-      mode = 'instrument';
-    } else if (savedInstrument === 'tuner') {
-      mode = 'tuner';
-    } else if (savedMode && instruments.includes(savedMode as typeof instruments[number])) {
-      mode = 'instrument';
+    } else if (isInstrument(savedMode)) {
       instrument = savedMode;
     }
-
     return { mode, instrument };
   }
 
-  private handleSettingsUpdated() {
-    this.loadStateFromLocalStorage();
-  }
-  
-  /**
-   * Toggles the Dark Mode.
-   * @param event - The event containing the checked state.
-   * @returns void
-   */
-  switchDarkMode(event: any) {
-    this.isDarkMode = event.detail.checked;
-    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
-    this.applyDarkMode(this.isDarkMode);
-    console.log('Dark Mode:', this.isDarkMode ? 'ON' : 'OFF');
-  }
-
-  /**
-   * Applies the dark theme CSS class to the document body.
-   * @param isDark - Boolean indicating if dark mode should be active.
-   * @returns void
-   */
-  applyDarkMode(isDark: boolean) {
-    if (isDark) {
-      document.body.classList.add('dark-theme');
-    } else {
-      document.body.classList.remove('dark-theme');
+  private handleSettingsUpdated(): void {
+    if (!this.isPlaying()) {
+      this.loadStateFromLocalStorage();
     }
   }
 
-  /**
-   * Loads instrument-specific settings.
-   * @param instrument - The instrument to load settings for.
-   * @returns void
-   */
-  private loadInstrumentSettings() {
+  private applyExerciseConfiguration(): void {
+    const instrument = this.instruments.fromLegacyId(this.selectedInstrument);
+    this.NOTES = instrument.notes.map(note => [...note.displayTokens]);
+    void this.soundsService.setInstrument(this.selectedInstrument);
+    this.loadInstrumentSettings();
+    this.currentNote = Math.min(this.currentNote, this.NOTES.length - 1);
+    this.updateScore(this.currentNote);
+    this.cdr.detectChanges();
+  }
+
+  private loadInstrumentSettings(): void {
     const key = this.exerciseNoteKey;
-    this.lowNote = this.retrieveAndParseFromLocalStorage(`${key}_lowNote`, INITIAL_NOTE);
-    this.highNote = this.retrieveAndParseFromLocalStorage(`${key}_highNote`, INITIAL_NOTE);
-    // Tempo is common for both instruments
-    const tempoSaved = this.retrieveAndParseFromLocalStorage('tempo', MINTEMPO);
-    if (tempoSaved !== MINTEMPO) {
-      this._tempo.setTempo(tempoSaved);
+    this.lowNote = this.clampNoteIndex(
+      this.retrieveAndParseFromLocalStorage(`${key}_lowNote`, INITIAL_NOTE)
+    );
+    this.highNote = this.clampNoteIndex(
+      this.retrieveAndParseFromLocalStorage(`${key}_highNote`, INITIAL_NOTE)
+    );
+    if (this.lowNote > this.highNote) {
+      this.highNote = this.lowNote;
     }
+    const storedTempo = this.retrieveAndParseFromLocalStorage('tempo', 80);
+    this.tempoSettings.setTempo(storedTempo);
   }
 
-  /**
-   * Lifecycle hook that is called when the view has entered.
-   * @returns void
-   */
-  /**
-   * Lifecycle hook that is called when the view is about to leave.
-   * @returns void
-   */
-  ionViewWillLeave(): void {
-    this._tempo.stop();
-    if (this.isTunerExercise()) {
-      this.chromaticTuner?.stop();
-    }
+  private clampNoteIndex(value: number): number {
+    return Math.max(0, Math.min(this.NOTES.length - 1, Number(value)));
   }
 
-  /**
-   * Retrieves and parses a value from local storage.
-   * @param key - The key to retrieve the value for.
-   * @param defaultValue - The default value to return if the key does not exist.
-   * @returns The parsed value from local storage or the default value.
-   */
   retrieveAndParseFromLocalStorage(key: string, defaultValue: any): any {
     const storedValue = localStorage.getItem(key);
     return storedValue ? JSON.parse(storedValue) : defaultValue;
   }
 
-  /**
-   * Selects an instrument based on user input.
-   * @param event - The event containing the selected instrument.
-   * @returns void
-   */
-  selectInstrument(event: any) {
-    this.selectedInstrument = event.detail.value;
-    console.log('Selected Instrument:', this.selectedInstrument);
+  selectInstrument(event: CustomEvent): void {
+    const instrument = event.detail.value;
+    if (instrument !== 'trumpet' && instrument !== 'clarinet' && instrument !== 'oboe') {
+      return;
+    }
+    this.selectedInstrument = instrument;
     this.applyExerciseConfiguration();
     this.saveCurrentStateToLocalStorage();
   }
 
-  /**
-   * Saves the current state to local storage.
-   * @returns void
-   */
-  private saveCurrentStateToLocalStorage() {
-    localStorage.setItem('selectedInstrument', this.selectedInstrument);
-    localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
-    localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
-    localStorage.setItem(`${this.exerciseNoteKey}_lowNote`, this.lowNote.toString());
-    localStorage.setItem(`${this.exerciseNoteKey}_highNote`, this.highNote.toString());
-    localStorage.setItem('tempo', this._tempo.tempo$.value.toString());
-    localStorage.setItem('mode', this.exerciseMode);
-    localStorage.setItem('refFrequencyValue', this.refFrequencyValue$.toString());
-  }
-
-  /**
-   * Checks if the device is muted and displays an alert if it is.
-   * @returns void
-   */
-  async checkMuted() {
-    if (Capacitor.getPlatform() === 'android') {
-      return;
-    }
-
-    try {
-      const muted = await Mute.isMuted();
-
-      if (!muted.value || this.muteAlert) {
-        return;
-      }
-      this.muteAlert = true;
-      const alert = await this.alertController.create({
-        header: 'Sound Check',
-        message: 'Make sure your sound is on to hear the instrument sounds.',
-        buttons: ['OK'],
-      });
-      alert.present();
-    } catch (e) {}
-  }
-
-  private isIOSWebBrowser(): boolean {
-    if (Capacitor.isNativePlatform()) {
-      return false;
-    }
-
-    const userAgent = navigator.userAgent || navigator.vendor || '';
-    return /iPad|iPhone|iPod/.test(userAgent)
-      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-
-  dismissIOSWebAudioHint() {
-    this.showIOSWebAudioHint = false;
-    sessionStorage.setItem('ios-web-audio-hint-dismissed', 'true');
-  }
-
-  /**
-   * Toggles the use of flats and sharps.
-   * @param event - The event containing the checked state.
-   * @returns void
-   */
-  switchUseFlatsAndSharps(event: any) {
+  switchUseFlatsAndSharps(event: CustomEvent): void {
     this.useFlatsAndSharps = event.detail.checked;
-    localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
-    console.log(event);
+    localStorage.setItem(
+      'useFlatsAndSharps',
+      JSON.stringify(this.useFlatsAndSharps)
+    );
     if (!this.useFlatsAndSharps) {
-      // Check that low and high notes are not on accidentals
-      // If they are, move them up by a half step
-      if (this.NOTES[this.lowNote].length == 2) {
-        this.lowNote++;
+      this.lowNote = this.nearestNaturalIndex(this.lowNote);
+      this.highNote = this.nearestNaturalIndex(this.highNote);
+      if (this.lowNote > this.highNote) {
+        this.highNote = this.lowNote;
       }
-      if (this.NOTES[this.highNote].length == 2) {
-        this.highNote++;
-      }
+      this.saveNotes();
     }
   }
 
-  /**
-   * Toggles the use of dynamics.
-   * @param event - The event containing the checked state.
-   * @returns void
-   */
-  switchUseDynamics(event: any) {
+  private nearestNaturalIndex(index: number): number {
+    if (this.NOTES[index]?.length === 1) {
+      return index;
+    }
+    for (let distance = 1; distance < this.NOTES.length; distance += 1) {
+      const above = index + distance;
+      if (above < this.NOTES.length && this.NOTES[above].length === 1) {
+        return above;
+      }
+      const below = index - distance;
+      if (below >= 0 && this.NOTES[below].length === 1) {
+        return below;
+      }
+    }
+    return index;
+  }
+
+  switchUseDynamics(event: CustomEvent): void {
     this.useDynamics = event.detail.checked;
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
     if (!this.useDynamics) {
-      this.score = scoreFromNote(this.NOTES[this.currentNote][0], this.exerciseNoteKey);
-      this.soundsService.setVolume(1.0);
+      this.updateScore(this.currentNote);
     }
   }
 
-  /**
-   * Changes the low note to the specified index.
-   * @param index - The new index for the low note.
-   * @returns void
-   */
-  changeLowNote(index: number) {
-    this.lowNote = index;
+  switchDarkMode(event: CustomEvent): void {
+    this.isDarkMode = event.detail.checked;
+    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
+    this.applyDarkMode(this.isDarkMode);
+  }
+
+  applyDarkMode(isDark: boolean): void {
+    document.body.classList.toggle('dark-theme', isDark);
+  }
+
+  changeLowNote(index: number): void {
+    this.lowNote = this.clampNoteIndex(index);
     if (!this.useFlatsAndSharps) {
-      if (this.NOTES[this.lowNote].length == 2) {
-        this.lowNote++;
-      }
+      this.lowNote = this.nearestNaturalIndex(this.lowNote);
     }
     if (this.lowNote > this.highNote) {
       this.highNote = this.lowNote;
@@ -473,482 +506,159 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     this.saveNotes();
   }
 
-  /**
-   * Changes the high note to the specified index.
-   * @param index - The new index for the high note.
-   * @returns void
-   */
-  changeHighNote(index: number) {
-    this.highNote = index;
+  changeHighNote(index: number): void {
+    this.highNote = this.clampNoteIndex(index);
     if (!this.useFlatsAndSharps) {
-      if (this.NOTES[this.highNote].length == 2) {
-        this.highNote--;
-      }
+      this.highNote = this.nearestNaturalIndex(this.highNote);
     }
-
     if (this.highNote < this.lowNote) {
       this.lowNote = this.highNote;
     }
     this.saveNotes();
   }
 
-  /**
-   * Saves the current low and high notes to local storage.
-   * @returns void
-   */
-  saveNotes() {
-    localStorage.setItem(`${this.exerciseNoteKey}_lowNote`, this.lowNote.toString());
-    localStorage.setItem(`${this.exerciseNoteKey}_highNote`, this.highNote.toString());
+  saveNotes(): void {
+    localStorage.setItem(`${this.exerciseNoteKey}_lowNote`, String(this.lowNote));
+    localStorage.setItem(`${this.exerciseNoteKey}_highNote`, String(this.highNote));
   }
 
-  /**
-   * Updates the position of the trumpet image based on the given note.
-   * @param note - The note to update the trumpet position to.
-   * @returns void
-   */
-  updateTrumpetPosition(note: number) {
-    const trumpetImg = POSITIONS[note];
-    this.trumpetBtns = TRUMPET_BTN[note];
-  }
-
-  /**
-   * Updates the position of the clarinet image based on the given note.
-   * @param note - The note to update the clarinet position to.
-   * @returns void
-   */
-  updateClarinetPosition(note: number) {
-    const clarinetImg = CLARINET_POSITIONS[note];
-    this.clarinetPosition = `assets/images/clarinet_positions/${clarinetImg}.svg`;
-  }
-    updateOboePosition(note: number) {
-    const oboeImg = OBOE_POSITIONS[note];
-    this.oboePosition = `assets/images/oboe_positions/${oboeImg}.svg`;
-  }
-
-  /**
-   * Updates the score image based on the given note.
-   * @param noteNumber - The index of the note to use for updating the score image.
-   * @returns void
-   */
-  updateScore(noteNumber: number) {
-    const _notes = this.NOTES[noteNumber];
-    const scoreImage = _notes.length == 1 ? _notes[0] : _notes[Math.floor(Math.random() * 2)];
+  updateScore(noteNumber: number): void {
+    const notes = this.NOTES[noteNumber];
+    if (!notes) {
+      return;
+    }
+    const displayToken = notes[Math.floor(Math.random() * notes.length)];
     if (this.useDynamics) {
       const dynamic = DYNAMICS[Math.floor(Math.random() * DYNAMICS.length)];
-      this.soundsService.setVolume(dynamic.volume);
-      this.score = scoreFromNote(scoreImage, this.exerciseNoteKey, dynamic.label);
+      this.score = scoreFromNote(
+        displayToken,
+        this.exerciseNoteKey,
+        dynamic.label
+      );
     } else {
-      this.score = scoreFromNote(scoreImage, this.exerciseNoteKey);
+      this.score = scoreFromNote(displayToken, this.exerciseNoteKey);
     }
   }
 
-  /**
-   * Generates a random note within the range of lowNote and highNote.
-   * @returns {number} The generated note index.
-   */
-  nextNote() {
-    const next = Math.round(Math.random() * (this.highNote - this.lowNote)) + this.lowNote;
-    if (!this.useFlatsAndSharps) {
-      if (this.NOTES[next].length == 2) {
-        return next + 1;
-      }
-    }
-    return next;
+  private saveCurrentStateToLocalStorage(): void {
+    localStorage.setItem('selectedInstrument', this.selectedInstrument);
+    localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
+    localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
+    localStorage.setItem('mode', this.exerciseMode);
+    localStorage.setItem('refFrequencyValue', String(this.refFrequencyValue$));
+    this.saveNotes();
   }
 
-  /**
-   * Handles the interval for the given tempo.
-   * @param {AppBeat} tempo - The tempo to handle the interval for.
-   * @returns void
-   */
-  intervalHandler(tempo: AppBeat) {
-    if (tempo.beat == 0) {
-      if (tempo.measure == 0) {
-        this.currentNote = this.nextNote();
-        this.soundsService.currentNote = this.currentNote;
-        this.updateScore(this.currentNote);
-        if (this.selectedInstrument === "trumpet") {
-          this.updateTrumpetPosition(this.currentNote);
-        } else if (this.selectedInstrument === "clarinet") {
-          this.updateClarinetPosition(this.currentNote);
-        }else if(this.selectedInstrument === "oboe"){
-          this.updateOboePosition(this.currentNote);
-        }
-      }
-
-      switch (tempo.measure) {
-        case 0:
-          this.currentAction = "Rest";
-          if (this.isTunerExercise()) {
-            const meansArray = this.chromaticTuner.stopCapture();
-            if (meansArray.length > 0) {
-              this.collectedMeansObject = {
-                ...this.collectedMeansObject,
-                [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-              };
-            }
-          } else {
-            this.setPitchFeedbackWaiting('Waiting');
-          }
-          break;
-        case 1:
-          this.currentAction = "Listen";
-          if (!this.isTunerExercise()) {
-            this.setPitchFeedbackWaiting('Listen');
-          }
-          break;
-        case 2:
-          this.currentAction = "Play";
-          if (this.isTunerExercise()) {
-            this.chromaticTuner.startCapture();
-          } else {
-            this.setPitchFeedbackWaiting('Waiting');
-            this.startPitchFeedback();
-          }
-          break;
-      }
-    }
-
-    if (tempo.cycle === MAXCYCLES) {
-      this.firebase.saveStop('finished', this.collectedMeansObject);
-      console.log('finished');
-      console.log('Collected Means', this.collectedMeansObject);
-      this.tabsService.setDisabled(false);
-      this.teardownAfterExercise();
-    }
-  }
-
-  /**
-   * Toggles between starting and stopping the tempo.
-   * If the tempo is currently playing, it will stop it.
-   * If the tempo is currently stopped, it will start it.
-   * @returns void
-   */
-  async startStop() {
-    if (this._tempo.playing$.value) {
-      this.stop();
-      this.tabsService.setDisabled(false);
-      this.cdr.markForCheck();
+  async checkMuted(): Promise<void> {
+    if (Capacitor.getPlatform() === 'android') {
       return;
     }
-
     try {
-      await this.soundsService.unlockAudio();
-      await this.soundsService.ensureSoundsReady();
-
-      if (!this.isTunerExercise()) {
-        await this.pitchService.primeMicrophoneAccess();
-        await this.pitchService.connect();
-      }
-
-      this.start();
-      this.tabsService.setDisabled(true);
-      this.cdr.detectChanges();
-
-      if (this.isTunerExercise() && this.chromaticTuner) {
-        await this.chromaticTuner.prepare();
-      }
-    } catch (error) {
-      console.error('Failed to start exercise', error);
-      this._tempo.stop();
-      this.tabsService.setDisabled(false);
-    }
-
-    this.cdr.markForCheck();
-  }
-
-  /**
-   * Starts the tempo and saves the current state to Firebase.
-   * @returns void
-   */
-  start() {
-    this.collectedMeansObject = {};
-    this._tempo.start();
-    this.firebase.saveStart(
-      this.tempo$.value,
-      this.lowNote,
-      this.highNote,
-      this.refFrequencyValue$,
-      this.useFlatsAndSharps,
-      this.useDynamics
-    );
-  }
-
-  /**
-   * Converts an app note name to frequency in Hz.
-   * Handles formats: C4, C4s, D4f, B3f, etc.
-   */
-  private noteNameToFrequency(noteName: string): number {
-    const match = noteName.match(/^([A-Ga-g])(#|s|b|f)?(\d+)$/);
-    if (!match) return 0;
-
-    const letter = match[1].toUpperCase();
-    const accidental = match[2];
-    const octave = parseInt(match[3], 10);
-
-    const semitoneMap: { [key: string]: number } = {
-      'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11
-    };
-
-    let semitone = semitoneMap[letter];
-    if (accidental === '#' || accidental === 's') semitone += 1;
-    if (accidental === 'b' || accidental === 'f') semitone -= 1;
-
-    const midi = (octave + 1) * 12 + semitone;
-    return 440 * Math.pow(2, (midi - 69) / 12);
-  }
-
-  private startPitchFeedback() {
-    if (this.pitchSubscription) {
-      return;
-    }
-
-    this.pitchSubscription = this.pitchService.pitch$.subscribe(pitch => {
-      if (this.currentAction !== 'Play') {
+      const muted = await Mute.isMuted();
+      if (!muted.value || this.muteAlert) {
         return;
       }
-
-      if (pitch <= 0 || this.currentNote < 0 || this.currentNote >= this.NOTES.length) {
-        this.setPitchFeedbackWaiting('Waiting');
-        return;
-      }
-
-      const targetNoteName = this.NOTES[this.currentNote][0];
-      const targetFreq = this.noteNameToFrequency(targetNoteName);
-      if (targetFreq <= 0) return;
-
-      const cents = 1200 * Math.log2(pitch / targetFreq);
-      this.pitchCents = cents;
-
-      // Map cents (-50 to +50) to bar position (0% to 100%)
-      const clampedCents = Math.max(-50, Math.min(50, cents));
-      this.pitchBarPosition = 50 + (clampedCents / 50) * 50;
-
-      if (cents >= -10 && cents <= 10) {
-        this.pitchAccuracyClass = 'in-tune';
-        this.pitchFeedbackLabel = 'In Tune';
-      } else if (cents >= -30 && cents <= 30) {
-        this.pitchAccuracyClass = 'close';
-        this.pitchFeedbackLabel = cents > 0 ? 'Sharp' : 'Flat';
-      } else {
-        this.pitchAccuracyClass = 'far';
-        this.pitchFeedbackLabel = cents > 0 ? 'Too Sharp' : 'Too Flat';
-      }
-    });
-  }
-
-  private stopPitchFeedback() {
-    this.pitchSubscription?.unsubscribe();
-    this.pitchSubscription = null;
-    this.resetPitchFeedback();
-  }
-
-  private setPitchFeedbackWaiting(label = 'Waiting') {
-    this.pitchCents = 0;
-    this.pitchAccuracyClass = 'waiting';
-    this.pitchFeedbackLabel = label;
-    this.pitchBarPosition = 50;
-  }
-
-  private resetPitchFeedback() {
-    this.setPitchFeedbackWaiting('Waiting');
-  }
-
-  private resetInstrumentVisual() {
-    if (this.selectedInstrument === 'trumpet') {
-      this.trumpetBtns = [];
-    } else if (this.selectedInstrument === 'clarinet') {
-      this.clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
-    } else if (this.selectedInstrument === 'oboe') {
-      this.oboePosition = 'assets/images/oboe_positions/A4.svg';
+      this.muteAlert = true;
+      const alert = await this.alertController.create({
+        header: 'Sound Check',
+        message: 'Make sure your sound is on to hear the instrument sounds.',
+        buttons: ['OK']
+      });
+      await alert.present();
+    } catch {
+      // Native mute status is optional on unsupported platforms.
     }
   }
 
-  private teardownAfterExercise() {
-    this.stopPitchFeedback();
-    this.resetInstrumentVisual();
-    this.currentAction = '';
-  }
-
-  /**
-   * Stops the tempo and all audio playback, and saves the stop event to Firebase.
-   * @returns void
-   */
-  stop() {
-    this._tempo.stop();
-    if (this.isTunerExercise() && this.chromaticTuner) {
-      const meansArray = this.chromaticTuner.stop();
-      if (meansArray.length > 0) {
-        this.collectedMeansObject = {
-          ...this.collectedMeansObject,
-          [Object.keys(this.collectedMeansObject).length + 1]: meansArray
-        };
-      }
-      console.log('Collected Means', this.collectedMeansObject);
+  private isIOSWebBrowser(): boolean {
+    if (Capacitor.isNativePlatform()) {
+      return false;
     }
-
-    // Disconnect pitch feedback
-    this.pitchSubscription?.unsubscribe();
-    this.pitchSubscription = null;
-    this.pitchService.disconnect();
-    this.resetPitchFeedback();
-
-    this.teardownAfterExercise();
-
-    Howler.stop();
-    this.firebase.saveStop('interrupted', this.collectedMeansObject);
-    this.cdr.markForCheck();
+    const userAgent = navigator.userAgent || navigator.vendor || '';
+    return /iPad|iPhone|iPod/.test(userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
 
-  /** Display name for the selected instrument (idle screen label). */
+  dismissIOSWebAudioHint(): void {
+    this.showIOSWebAudioHint = false;
+    sessionStorage.setItem('ios-web-audio-hint-dismissed', 'true');
+  }
+
   get selectedInstrumentDisplayName(): string {
-    if (this.isTunerExercise()) {
-      return 'Tuner';
-    }
-
-    return this.instrumentDisplayNames[this.selectedInstrument]
-      ?? this.selectedInstrument.charAt(0).toUpperCase() + this.selectedInstrument.slice(1);
+    return this.isTunerExercise()
+      ? 'Tuner'
+      : this.instrumentDisplayNames[this.selectedInstrument];
   }
 
-  /**
-   * Storage/score/note-selector key for the selected instrument.
-   */
-  get exerciseNoteKey(): string {
+  get exerciseNoteKey(): LegacyInstrumentId {
     return this.selectedInstrument;
   }
 
-  private applyExerciseConfiguration(): void {
-    this.NOTES = this.getNotesForInstrument(this.exerciseNoteKey);
-    this.soundsService.setInstrument(this.selectedInstrument);
-    this.loadInstrumentSettings();
-
-    if (!this._tempo.playing$.value) {
-      this.updateScore(this.currentNote);
-    }
-
-    this.cdr.detectChanges();
-  }
-
-  /** Tuner mode: practice with pitch feedback, no fingering diagram. */
   isTunerExercise(): boolean {
     return this.exerciseMode === 'tuner';
   }
 
-  /**
-   * Returns a boolean indicating whether the tempo is currently playing or not.
-   * @returns {boolean} A boolean indicating whether the tempo is currently playing.
-   */
-  isPlaying(): boolean {
-    return this._tempo.playing$.value;
-  }
-  //return this.NOTES.map(note => `
   getNoteImg(note: number): string {
-   return 'assets/images/clarinet_notes_images/_${this.NOTES[note][0]}.png';
-    //return `assets/images/${this.NOTES}_notes_images/_${this.NOTES[note][0]}.png`;
+    return `assets/images/clarinet_notes_images/_${this.NOTES[note]?.[0] ?? ''}.png`;
   }
-  /**
-   * Opens a picker for selecting frequency or tempo.
-   * @param type - The type of picker to open ('frequency' or 'tempo').
-   * @returns void
-   */
-  async openPicker(type: 'frequency' | 'tempo') {
+
+  async openPicker(type: 'frequency' | 'tempo'): Promise<void> {
     if (this.isPlaying()) {
       return;
     }
 
-    let options: { value: number, text: string }[];
-    let selectedIndex = 0;
-    let selectedValue: number;
-    let rangeValues: number[] = [];
-    let unit: string;
-
-    if (type === 'frequency') {
-      selectedValue = this.refFrequencyValue$;
-      rangeValues = range(MINREFFREQUENCY, MAXREFFREQUENCY + 1, 1);
-      unit = 'Hz';
-    } else if (type === 'tempo') {
-      selectedValue = this.tempo$.value;
-      rangeValues = range(MINTEMPO, MAXTEMPO + 1, 5);
-      unit = 'bpm';
-    }
-
-    options = rangeValues.map(value => ({
-      value: value,
+    const selectedValue = type === 'frequency'
+      ? this.refFrequencyValue$
+      : this.tempoSettings.tempo$.value;
+    const rangeValues = type === 'frequency'
+      ? range(MINREFFREQUENCY, MAXREFFREQUENCY + 1, 1)
+      : range(MINTEMPO, MAXTEMPO + 1, 5);
+    const unit = type === 'frequency' ? 'Hz' : 'bpm';
+    const options = rangeValues.map(value => ({
+      value,
       text: `${value} ${unit}`
     }));
 
-    selectedIndex = options.findIndex(option => option.value === selectedValue);
-
-    const picker = await this._picker.create({
+    const picker = await this.picker.create({
       cssClass: 'settings-picker-overlay',
-      columns: [
-        {
-          name: type,
-          options: options,
-          selectedIndex: selectedIndex
-        },
-      ],
+      columns: [{
+        name: type,
+        options,
+        selectedIndex: options.findIndex(option => option.value === selectedValue)
+      }],
       buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel',
-        },
+        { text: 'Cancel', role: 'cancel' },
         {
           text: 'Confirm',
-          handler: (value) => {
+          handler: value => {
             if (type === 'frequency') {
               this.refFrequencyValue$ = value[type].value;
               this.refFrequencyService.setRefFrequency(this.refFrequencyValue$);
               this.saveCurrentStateToLocalStorage();
-            } else if (type === 'tempo') {
-              this._tempo.setTempo(value[type].value);
+            } else {
+              this.tempoSettings.setTempo(value[type].value);
             }
           }
-        },
-      ],
+        }
+      ]
     });
-
     await picker.present();
   }
 
-  /**
-   * Changes the tempo to the specified value.
-   * @param tempo - The new tempo value.
-   * @returns void
-   */
-  changeTempo(tempo: number) {
-    this._tempo.setTempo(tempo);
+  changeTempo(tempo: number): void {
+    this.tempoSettings.setTempo(tempo);
   }
 
-  /**
-   * Determines whether the modal can be dismissed or not.
-   * @param data - Optional data passed to the modal.
-   * @param role - Optional role of the modal.
-   * @returns A Promise that resolves to a boolean indicating whether the modal can be dismissed.
-   */
-  async canDismiss(data?: any, role?: string) {
+  async canDismiss(_data?: any, role?: string): Promise<boolean> {
     return role !== 'gesture';
   }
 
-  /**
-   * Navigates to the user profile page.
-   * @returns void
-   */
-  goToProfile() {
-    this.router.navigate(['/profile']);
+  goToProfile(): void {
+    void this.router.navigate(['/profile']);
   }
 
-  /**
-   * Lifecycle hook that is called after the view has been initialized.
-   * @returns void
-   */
-  ngAfterViewInit() {
-    window.addEventListener('mei-settings-updated', this.boundRefreshSettings);
-  }
-
-  changeLanguage(event: any) {
-    this.language = event.detail.value; // Update the language based on the selected value
-    localStorage.setItem('language', this.language); // Optionally save the language to local storage
-    console.log('Language:', this.language);
+  changeLanguage(event: CustomEvent): void {
+    this.language = event.detail.value;
+    localStorage.setItem('language', this.language);
   }
 }

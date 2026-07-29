@@ -9,6 +9,11 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { Howler } from 'howler';
 import * as pitchlite from 'src/app/services/pitchlite';
+import {
+    PitchEstimate,
+    PitchInputPort,
+    PitchInputSession
+} from '../core/activity/activity-context';
 
 const workletChunkSize = 128;
 const bigWindow = 4096;
@@ -21,9 +26,35 @@ const useYin = false; // use MPM by default
  * @param array - The Float32Array to scale.
  * @returns A new Float32Array scaled to the range of -1 to 1.
  */
-export function scaleArrayToMinusOneToOne(array: Float32Array) {
+export type AudioFrameNormalization =
+    | { kind: 'normalized'; data: Float32Array }
+    | { kind: 'silence'; data: Float32Array }
+    | { kind: 'invalid'; data: Float32Array };
+
+export function normalizeAudioFrame(array: Float32Array): AudioFrameNormalization {
+    if (array.some(value => !Number.isFinite(value))) {
+        return {
+            kind: 'invalid',
+            data: new Float32Array(array.length)
+        };
+    }
+
     const maxAbsValue = Math.max(...array.map(Math.abs));
-    return array.map((value) => value / maxAbsValue);
+    if (maxAbsValue === 0) {
+        return {
+            kind: 'silence',
+            data: new Float32Array(array.length)
+        };
+    }
+
+    return {
+        kind: 'normalized',
+        data: array.map(value => value / maxAbsValue)
+    };
+}
+
+export function scaleArrayToMinusOneToOne(array: Float32Array): Float32Array {
+    return normalizeAudioFrame(array).data;
 }
 
 @Injectable({
@@ -32,7 +63,7 @@ export function scaleArrayToMinusOneToOne(array: Float32Array) {
 /**
  * Service for pitch detection using Web Audio API and WebAssembly.
  */
-export class PitchService {
+export class PitchService implements PitchInputPort {
     private isStopped = false;
     private accumNode!: AudioWorkletNode;
     private analyser!: AnalyserNode;
@@ -47,11 +78,18 @@ export class PitchService {
     private audioContext: AudioContext | null = null;
     private connectPromise: Promise<void> | null = null;
     private usingSharedAudioContext = false;
+    private activitySessionActive = false;
 
     /**
      * Observable that emits the detected pitch.
      */
     pitch$ = new BehaviorSubject<number>(0);
+    estimates$ = new BehaviorSubject<PitchEstimate>({
+        kind: 'unvoiced',
+        reason: 'silence',
+        capturedAtMs: 0,
+        emittedAtMs: 0
+    });
 
     /**
      * Connects to the audio input and initializes the pitch detection.
@@ -161,7 +199,21 @@ export class PitchService {
         gainNode.connect(audioContext.destination);
 
         this.accumNode.port.onmessage = (event) => {
-            const scaledData = scaleArrayToMinusOneToOne(event.data.data);
+            const capturedAtMs = performance.now();
+            const normalization = normalizeAudioFrame(event.data.data);
+            if (normalization.kind !== 'normalized') {
+                this.nAccumulated = 0;
+                this.pitch$.next(0);
+                this.estimates$.next({
+                    kind: 'unvoiced',
+                    reason: normalization.kind,
+                    capturedAtMs,
+                    emittedAtMs: performance.now()
+                });
+                return;
+            }
+
+            const scaledData = normalization.data;
             const offset = (this.nAccumulated * workletChunkSize) * Float32Array.BYTES_PER_ELEMENT;
 
             this.wasmModule.HEAPF32.set(scaledData, (this.ptr + offset) / Float32Array.BYTES_PER_ELEMENT);
@@ -172,10 +224,59 @@ export class PitchService {
                 this.wasmModule._pitchlitePitches(this.ptr, this.ptrPitches);
 
                 const wasmArrayPitches = new Float32Array(this.wasmModule.HEAPF32.buffer, this.ptrPitches, this.n_pitches);
-                this.pitch$.next(wasmArrayPitches[this.n_pitches - 1]);
+                const pitch = wasmArrayPitches[this.n_pitches - 1];
+                if (Number.isFinite(pitch) && pitch > 0) {
+                    this.pitch$.next(pitch);
+                    this.estimates$.next({
+                        kind: 'voiced',
+                        frequencyHz: pitch,
+                        capturedAtMs,
+                        emittedAtMs: performance.now()
+                    });
+                } else {
+                    this.pitch$.next(0);
+                    this.estimates$.next({
+                        kind: 'unvoiced',
+                        reason: 'invalid',
+                        capturedAtMs,
+                        emittedAtMs: performance.now()
+                    });
+                }
                 this.wasmModule._memset(this.ptr, 0, bigWindow * Float32Array.BYTES_PER_ELEMENT);
             }
         };
+    }
+
+    async acquire(signal: AbortSignal): Promise<PitchInputSession> {
+        if (this.activitySessionActive) {
+            throw new Error('The microphone is already owned by an activity session');
+        }
+
+        this.activitySessionActive = true;
+        let released = false;
+        const release = async () => {
+            if (released) {
+                return;
+            }
+            released = true;
+            signal.removeEventListener('abort', abortRelease);
+            this.disconnect();
+            this.activitySessionActive = false;
+        };
+        const abortRelease = () => {
+            void release();
+        };
+
+        try {
+            await this.primeMicrophoneAccess();
+            await this.connect();
+            signal.addEventListener('abort', abortRelease, { once: true });
+            return { release };
+        } catch (error) {
+            this.activitySessionActive = false;
+            this.disconnect();
+            throw error;
+        }
     }
     /**
      * Disconnects the audio input and cleans up resources.
@@ -227,5 +328,13 @@ export class PitchService {
         this.ptrPitches = null;
         this.wasmModule = null;
         this.nAccumulated = 0;
+        this.pitch$.next(0);
+        const nowMs = performance.now();
+        this.estimates$.next({
+            kind: 'unvoiced',
+            reason: 'silence',
+            capturedAtMs: nowMs,
+            emittedAtMs: nowMs
+        });
     }
 }

@@ -1,45 +1,42 @@
-import { EventEmitter } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
-import { AppBeat } from '../models/appbeat.types';
+import { Howl } from 'howler';
+import { InstrumentRegistryService } from '../instruments/instrument-registry.service';
 import { SoundsService } from './sounds.service';
 
-describe('SoundsService current beat coupling', () => {
+describe('SoundsService explicit audio port', () => {
   beforeEach(() => {
     spyOn<any>(SoundsService.prototype, 'preloadSounds').and.resolveTo();
   });
 
-  function createService() {
-    const tick$ = new EventEmitter<AppBeat>();
-    const beat = {
-      tick$,
-      tempo$: new BehaviorSubject(80)
-    };
-    const service = new SoundsService(beat as any);
-    spyOn(service, 'playMetronome');
-    spyOn(service, 'playNoteSound');
-    return { service, tick$ };
-  }
+  it('has no hidden activity-timing subscription or automatic playback', () => {
+    const service = new SoundsService();
+    const metronome = spyOn(service, 'playMetronome');
+    const reference = spyOn(service, 'playReference');
 
-  it('plays a metronome on every tick regardless of the playing flag', () => {
-    const { service, tick$ } = createService();
-
-    tick$.emit({ playing: false, measure: 0, beat: 0, cycle: 12 });
-    tick$.emit({ playing: true, measure: 0, beat: 0, cycle: 12 });
-
-    expect(service.playMetronome).toHaveBeenCalledTimes(2);
-    expect(service.playMetronome).toHaveBeenCalledWith(0);
-    expect(service.playNoteSound).not.toHaveBeenCalled();
+    expect(metronome).not.toHaveBeenCalled();
+    expect(reference).not.toHaveBeenCalled();
   });
 
-  it('starts the current reference note only at beat zero of measure one', () => {
-    const { service, tick$ } = createService();
-    service.currentNote = 13;
+  it('derives bounded reference playback rate from the selected A4', () => {
+    const service = new SoundsService();
+    const registry = new InstrumentRegistryService();
+    const instrument = registry.get('oboe-c');
+    const note = instrument.notes.find(
+      candidate => candidate.displayTokens[0] === 'A4'
+    )!;
+    const target = registry.resolveTarget(instrument.id, note.id, 450);
+    const audio = jasmine.createSpyObj<Howl>(
+      'Howl',
+      ['play', 'rate', 'volume', 'fade', 'stop']
+    );
+    audio.play.and.returnValue(7);
+    (service as any).preloadedNotes = new Map([[target.noteId, audio]]);
 
-    tick$.emit({ playing: true, measure: 1, beat: 0, cycle: 1 });
-    tick$.emit({ playing: true, measure: 1, beat: 1, cycle: 1 });
-    tick$.emit({ playing: true, measure: 2, beat: 0, cycle: 1 });
+    service.playReference(target, {
+      durationMs: 3000,
+      gain: 1,
+      desiredReferenceA4Hz: 450
+    });
 
-    expect(service.playMetronome).toHaveBeenCalledTimes(3);
-    expect(service.playNoteSound).toHaveBeenCalledOnceWith(13);
+    expect(audio.rate).toHaveBeenCalledOnceWith(450 / 440, 7);
   });
 });

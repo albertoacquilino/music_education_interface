@@ -7,8 +7,16 @@
  */
 
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, HostListener, Input } from '@angular/core';
-import { BehaviorSubject, combineLatest } from 'rxjs';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  HostListener,
+  Input,
+  OnDestroy,
+  ViewChild
+} from '@angular/core';
+import { BehaviorSubject, Subscription, combineLatest } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { Flow } from 'vexflow';
 import { Score } from 'src/app/models/score.types';
@@ -26,7 +34,7 @@ import { RenderContext, Renderer } from 'vexflow';
 @Component({
   selector: 'score-view',
   template: `
-    <div id="score" class="score-surface"></div>
+    <div #scoreSurface class="score-surface"></div>
     <div *ngIf="displayNoteName" class="score-note-name">
       <strong>{{ displayNoteName }}</strong>
     </div>
@@ -63,7 +71,9 @@ import { RenderContext, Renderer } from 'vexflow';
   standalone: true,
   imports: [CommonModule]
 })
-export class ScoreViewComponent implements AfterViewInit {
+export class ScoreViewComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('scoreSurface', { static: true })
+  private scoreSurface!: ElementRef<HTMLDivElement>;
   private size$ = new BehaviorSubject<{ width: number, height: number }>({ width: 0, height: 0 });
 
   private score$ = new BehaviorSubject<Score | null>(null);
@@ -84,6 +94,8 @@ export class ScoreViewComponent implements AfterViewInit {
   @Input() language: string = 'en';
   private _renderer!: Renderer;
   private _context!: RenderContext;
+  private renderSubscription?: Subscription;
+  private resizeTimer?: number;
   displayNoteName = '';
   /**
    * Constructor for the ScoreViewComponent.
@@ -131,29 +143,29 @@ export class ScoreViewComponent implements AfterViewInit {
    * in size and score, and sets the size of the component after a short delay.
    */
   ngAfterViewInit(): void {
-    const div = document.getElementById("score");
-    if (!div) {
-      throw new Error("Div not found");
-    }
+    const div = this.scoreSurface.nativeElement;
     this._renderer = new Flow.Renderer(div as HTMLDivElement, Flow.Renderer.Backends.SVG);
     this._context = this._renderer.getContext();
 
-    combineLatest([this.size$, this.score$]).pipe(
-      filter(([_, score]) => score !== null),
+    this.renderSubscription = combineLatest([this.size$, this.score$]).pipe(
+      filter(([size, score]) =>
+        score !== null && size.width > 0 && size.height > 0
+      ),
     ).subscribe(([size, score]) => {
       this.updateSize(size);
       this.updateScore(score as Score)
-
-      // aleksandra - not use cuz of document selector - didnt find other way :(
-      // const dynamic = document.querySelector('#score > svg > text')
-      // if (dynamic) {
-      //   dynamic.setAttribute('font-style', 'italic')
-      // }
     });
 
-    setTimeout(() => {
+    this.resizeTimer = window.setTimeout(() => {
       this.setSize();
     }, 1000);
+  }
+
+  ngOnDestroy(): void {
+    this.renderSubscription?.unsubscribe();
+    if (this.resizeTimer !== undefined) {
+      window.clearTimeout(this.resizeTimer);
+    }
   }
 
   /**
@@ -194,10 +206,8 @@ export class ScoreViewComponent implements AfterViewInit {
 
       // Handle dynamics
       if (score.dynamic) {
-        if (score.dynamicPosition === undefined) {
-          score.dynamicPosition = 1;
-        }
-        if (score.dynamicPosition === index + 1) {
+        const dynamicPosition = score.dynamicPosition ?? 1;
+        if (dynamicPosition === index + 1) {
           staveMeasure.setText(score.dynamic,
             Flow.Modifier.Position.BELOW, {
             shift_y: 30,
@@ -214,41 +224,16 @@ export class ScoreViewComponent implements AfterViewInit {
       Flow.Formatter.FormatAndDraw(this._context, staveMeasure, notesMeasure);
     }
 
-// // After all measures drawn (i.e. after your for loop)
-// setTimeout(() => {
-//   const svg = document.querySelector("#score > svg");
-//   if (!svg) return;
-//   svg.querySelectorAll("text").forEach((textEl: any) => {
-//     const val = textEl.textContent?.trim();
-//     if (val === "mf" || val === "f" || val === "p") {
-//       textEl.setAttribute("font-style", "italic");
-//       textEl.setAttribute("font-weight", "bold");
-//       // textEl.setAttribute("font-size", "22px");
-//     }
-//   });
-// }, 1);
-// === MutationObserver version, no need for setTimeout! ===
-const div = document.getElementById("score");
-if (!div) return;
-
-// Observer callback function
-const observer = new MutationObserver((mutations, obs) => {
-  const svg = div.querySelector("svg");
-  if (svg) {
-    svg.querySelectorAll("text").forEach((textEl: any) => {
+    const svg = this.scoreSurface.nativeElement.querySelector('svg');
+    if (svg) {
+      svg.querySelectorAll('text').forEach((textEl: SVGTextElement) => {
       const val = textEl.textContent?.trim();
-      if (val === "mf" || val === "f" || val === "p") {
-        textEl.setAttribute("font-style", "italic");
-        textEl.setAttribute("font-weight", "bold");
+      if (val === 'mf' || val === 'f' || val === 'p') {
+        textEl.setAttribute('font-style', 'italic');
+        textEl.setAttribute('font-weight', 'bold');
       }
     });
-    obs.disconnect(); // Stop observing once done!
-  }
-});
-
-observer.observe(div, { childList: true, subtree: true });
-
-
+    }
   }
 
   private getDisplayNoteName(score: Score): string {

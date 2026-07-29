@@ -17,7 +17,10 @@
             <div class="idle-instrument-display"
               [class.is-vertical-instrument]="!isTunerExercise() && (selectedInstrument === 'clarinet' || selectedInstrument === 'oboe')">
               <ng-container *ngIf="isTunerExercise(); else idleInstrumentDiagram">
-                <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+                <chromatic-tuner
+                  [refFrequencyValue$]="refFrequencyValue$"
+                  [pitchHz]="tunerPitchHz"
+                ></chromatic-tuner>
               </ng-container>
               <ng-template #idleInstrumentDiagram>
                 <ng-container *ngIf="selectedInstrument === 'trumpet'">
@@ -42,8 +45,8 @@
           <aside class="exercise-rail exercise-rail--status surface-panel" aria-label="Beat and phase">
             <div class="metronome status-panel">
               <div class="metronome-bullet">
-                <h1 id="metronome-label" *ngIf="beat$|async as beat">
-                  {{ beat.beat >= 0 ? (beat.beat + 1): '&nbsp;'}}
+                <h1 id="metronome-label">
+                  {{ currentBeat >= 0 ? (currentBeat + 1): '&nbsp;'}}
                 </h1>
                 <semaphore-light [currentAction]="currentAction"></semaphore-light>
               </div>
@@ -56,7 +59,10 @@
               aria-label="Instrument">
               <ng-container *ngIf="isTunerExercise(); else playingInstrumentDiagram">
                 <div class="chromatic-tuner visual-panel">
-                  <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+                  <chromatic-tuner
+                    [refFrequencyValue$]="refFrequencyValue$"
+                    [pitchHz]="tunerPitchHz"
+                  ></chromatic-tuner>
                 </div>
               </ng-container>
               <ng-template #playingInstrumentDiagram>

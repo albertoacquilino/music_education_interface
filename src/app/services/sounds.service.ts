@@ -6,145 +6,117 @@
  * See the LICENSE file for more details.
  */
 
-import { Injectable } from "@angular/core";
-import { BeatService } from "./beat.service";
-import { AppBeat } from '../models/appbeat.types';
-import { Howl, Howler } from "howler";
-import { BehaviorSubject } from "rxjs";
-import { TRUMPET_NOTES, CLARINET_NOTES,OBOE_NOTES} from "../constants";
+import { Injectable } from '@angular/core';
+import { Howl, Howler } from 'howler';
+import { BehaviorSubject } from 'rxjs';
+import {
+    AudioPlayback,
+    AudioPort,
+    ReferencePlaybackOptions
+} from '../core/activity/activity-context';
+import {
+    InstrumentDefinition,
+    LegacyInstrumentId,
+    NoteTarget
+} from '../instruments/instrument-definition';
+import { INSTRUMENT_DEFINITIONS } from '../instruments/instrument-registry.service';
 
-// Predefined beat sounds
 export const BEAT_SOUNDS = [
     new Howl({ src: ['assets/sounds/tick_strong.m4a'] }),
-    new Howl({ src: ['assets/sounds/tick_weak.m4a'] }),
-    new Howl({ src: ['assets/sounds/tick_weak.m4a'] }),
     new Howl({ src: ['assets/sounds/tick_weak.m4a'] })
-]
+];
 
-/**
- * Plays an audio file and fades it out after a specified duration.
- * @param audio - The Howl audio object to play.
- * @param duration - The duration in milliseconds to play the audio before fading it out.
- * @param volume - The volume level to set for the audio.
- */
-function playAndFade(audio: Howl, duration: number, volume: number = 1.0) {
+function playAndFade(
+    audio: Howl,
+    durationMs: number,
+    volume: number,
+    playbackRate: number
+): AudioPlayback {
     audio.volume(volume);
-    const id1 = audio.play();
-    const fade = Math.max(duration / 10, 100);
-    setTimeout(() => {
-        audio.fade(volume, 0, fade, id1);
-    }, duration - fade);
-    setTimeout(() => {
-        audio.stop(id1);
-    }, duration);
+    const soundId = audio.play();
+    audio.rate(playbackRate, soundId);
+    const fadeMs = Math.max(durationMs / 10, 100);
+    const fadeTimer = window.setTimeout(() => {
+        audio.fade(volume, 0, fadeMs, soundId);
+    }, durationMs - fadeMs);
+    const stopTimer = window.setTimeout(() => {
+        audio.stop(soundId);
+    }, durationMs);
+
+    return {
+        stop: (requestedFadeMs = 0) => {
+            window.clearTimeout(fadeTimer);
+            window.clearTimeout(stopTimer);
+            if (requestedFadeMs > 0) {
+                audio.fade(audio.volume(), 0, requestedFadeMs, soundId);
+                window.setTimeout(() => audio.stop(soundId), requestedFadeMs);
+            } else {
+                audio.stop(soundId);
+            }
+        }
+    };
 }
 
 @Injectable({
     providedIn: 'root'
 })
-/**
- * Service for managing and playing sounds in the application.
- */
-export class SoundsService {
-    private selectedInstrument: string = 'trumpet'; // Default instrument
-    private preloadedNotes: Howl[] = []; // Array to hold preloaded note sounds
-    private preloadVersion = 0; // Guards against overlapping async preload calls
+export class SoundsService implements AudioPort {
+    private selectedInstrument: LegacyInstrumentId = 'trumpet';
+    private preloadedNotes = new Map<string, Howl>();
+    private preloadVersion = 0;
     private preloadTask: Promise<void> = Promise.resolve();
     private audioUnlocked = false;
     private loadingSubject = new BehaviorSubject<boolean>(true);
-    currentNote: number = 0; // Index of the current note
-    volume: number = 1.0; // Volume level for sound playback
+
+    volume = 1.0;
     loading$ = this.loadingSubject.asObservable();
 
-    /**
-     * Creates an instance of SoundsService.
-     * @param {BeatService} _beat - The BeatService instance for synchronizing sounds with beats.
-     */
-    constructor(private _beat: BeatService) {
-        this.preloadTask = this.preloadSounds(); // Preload sounds on initialization
-        this._beat.tick$.subscribe((beat) => this.playSounds(beat)); // Subscribe to beat ticks
+    constructor() {
+        this.preloadTask = this.preloadSounds();
     }
 
-    /**
-     * Preloads all the sounds used in the app based on the selected instrument.
-     * @returns void
-     */
-    // private preloadSounds() {
-    //     let notesToLoad;
-
-    // if (this.selectedInstrument === 'trumpet') {
-    //     notesToLoad = TRUMPET_NOTES;
-    // } else if (this.selectedInstrument === 'clarinet') {
-    //     notesToLoad = CLARINET_NOTES;
-    // } else if (this.selectedInstrument === 'oboe') {
-    //     notesToLoad = OBOE_NOTES;
-    // } else {
-    //     console.warn('Unknown instrument:', this.selectedInstrument);
-    //     return;
-    // }
-    //     for (let sound of BEAT_SOUNDS) {
-    //         sound.load(); // Load beat sounds
-    //     }
-    //     this.preloadedNotes = [];
-    //     for (let i = 0; i < notesToLoad.length; i++) {
-    //         const note = notesToLoad[i];
-    //         const soundFile = note[0];
-
-    //         const audio = new Howl({ src: [`assets/sounds/${this.selectedInstrument}_note_sounds/${soundFile}.m4a`] });
-    //         this.preloadedNotes.push(audio); // Store preloaded note sounds
-    //     }
-    // }
-    private async preloadSounds() {
+    private async preloadSounds(): Promise<void> {
         const preloadVersion = ++this.preloadVersion;
-        const instrument = this.selectedInstrument;
+        const instrumentId = this.selectedInstrument;
+        const instrument = INSTRUMENT_DEFINITIONS.find(
+            candidate => candidate.legacyId === instrumentId
+        );
         this.loadingSubject.next(true);
-        let notesToLoad;
 
-        if (instrument === 'trumpet') {
-            notesToLoad = TRUMPET_NOTES;
-        } else if (instrument === 'clarinet') {
-            notesToLoad = CLARINET_NOTES;
-        } else if (instrument === 'oboe') {
-            notesToLoad = OBOE_NOTES;
-        } else {
-            console.warn('Unknown instrument:', instrument);
-            if (preloadVersion === this.preloadVersion) {
-                this.loadingSubject.next(false);
-            }
-            return;
+        if (!instrument) {
+            this.loadingSubject.next(false);
+            throw new Error(`Unsupported instrument: ${instrumentId}`);
         }
 
         try {
-            for (const sound of BEAT_SOUNDS) {
-                sound.load();
-            }
-
-            // Build note sounds off to the side so overlapping async preloads cannot
-            // scramble the index-to-note mapping used during playback.
+            BEAT_SOUNDS.forEach(sound => sound.load());
             const loadedNotes = await Promise.all(
-                notesToLoad.map(async (noteVariants) => {
-                    const filePath = await this.resolveAudioPath(instrument, noteVariants);
-                    return this.createLoadedHowl(filePath);
+                instrument.notes.map(async note => {
+                    const audio = await this.createLoadedHowl(note.referenceAudio.path);
+                    return [note.id, audio] as const;
                 })
             );
 
-            if (preloadVersion !== this.preloadVersion || instrument !== this.selectedInstrument) {
-                return;
+            if (
+                preloadVersion === this.preloadVersion
+                && instrumentId === this.selectedInstrument
+            ) {
+                this.preloadedNotes = new Map(loadedNotes);
             }
-
-            this.preloadedNotes = loadedNotes;
         } finally {
-            if (preloadVersion === this.preloadVersion && instrument === this.selectedInstrument) {
+            if (
+                preloadVersion === this.preloadVersion
+                && instrumentId === this.selectedInstrument
+            ) {
                 this.loadingSubject.next(false);
             }
         }
     }
 
     private createLoadedHowl(filePath: string): Promise<Howl> {
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             let settled = false;
             let howl!: Howl;
-
             const finish = () => {
                 if (!settled) {
                     settled = true;
@@ -170,62 +142,28 @@ export class SoundsService {
         });
     }
 
-/**
- * Utility function to check if a file exists
- */
-private async fileExists(url: string): Promise<boolean> {
-    try {
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
-    } catch {
-        return false;
-    }
-}
-
-private async resolveAudioPath(instrument: string, noteVariants: string[]): Promise<string> {
-    const candidates: string[] = [];
-
-    for (const noteName of noteVariants) {
-        candidates.push(`assets/sounds/${instrument}_note_sounds/${noteName}.m4a`);
-    }
-
-    for (const candidate of candidates) {
-        if (await this.fileExists(candidate)) {
-            return candidate;
+    setInstrument(instrument: string): Promise<void> {
+        if (!this.isLegacyInstrumentId(instrument)) {
+            return Promise.reject(new Error(`Unsupported instrument: ${instrument}`));
         }
-    }
-
-    return candidates[0];
-}
-
-        /**
-     * Sets the instrument for sound playback and reloads the corresponding sounds.
-     * @param {string} instrument - The name of the instrument to set (e.g., 'trumpet', 'clarinet').
-     * @returns void
-     * @example
-     * soundsService.setInstrument('clarinet');
-     */
-    public setInstrument(instrument: string): Promise<void> {
-        if (this.selectedInstrument === instrument && this.preloadedNotes.length > 0) {
+        if (
+            this.selectedInstrument === instrument
+            && this.preloadedNotes.size > 0
+        ) {
             return this.preloadTask;
         }
 
         this.selectedInstrument = instrument;
-        this.preloadedNotes = [];
-        this.preloadTask = this.preloadSounds(); // Reload sounds for the new instrument
+        this.preloadedNotes = new Map();
+        this.preloadTask = this.preloadSounds();
         return this.preloadTask;
     }
 
-    public async ensureSoundsReady() {
+    async ensureSoundsReady(): Promise<void> {
         await this.preloadTask;
     }
 
-    /**
-     * Unlocks audio playback after a direct user gesture.
-     * This is especially important on iOS Safari, which can keep
-     * Web Audio suspended until the first trusted interaction.
-     */
-    async unlockAudio() {
+    async unlockAudio(): Promise<void> {
         if (this.audioUnlocked) {
             return;
         }
@@ -249,57 +187,45 @@ private async resolveAudioPath(instrument: string, noteVariants: string[]): Prom
         }
     }
 
-    /**
-     * Plays the trumpet sound for the current note.
-     * @param {number} currentNote - The current note index.
-     */
-    playNoteSound(currentNote: number) {
-        const audio = this.preloadedNotes[currentNote];
-        if (audio) {
-            playAndFade(audio, 4 * 60000 / this._beat.tempo$.value, this.volume); // Play and fade the note sound
+    unlockFromUserGesture(): Promise<void> {
+        return this.unlockAudio();
+    }
+
+    preloadInstrument(instrument: InstrumentDefinition): Promise<void> {
+        return this.setInstrument(instrument.legacyId);
+    }
+
+    playMetronome(accent: 'strong' | 'weak'): AudioPlayback {
+        const audio = BEAT_SOUNDS[accent === 'strong' ? 0 : 1];
+        const soundId = audio.play();
+        return {
+            stop: () => audio.stop(soundId)
+        };
+    }
+
+    playReference(
+        target: NoteTarget,
+        options: ReferencePlaybackOptions
+    ): AudioPlayback {
+        const audio = this.preloadedNotes.get(target.noteId);
+        if (!audio) {
+            throw new Error(`Reference audio was not preloaded for ${target.noteId}`);
         }
-    }
-    // playTrumpetSound(currentNote: number) {
-    //     const audio = this.preloadedNotes[currentNote];
-    //     playAndFade(audio, 4 * 60000 / this._beat.tempo$.value, this.volume);
-    // }
 
-    /**
-     * Plays the metronome sound for the given beat counter.
-     * @param {number} beatCounter - The beat counter indicating which sound to play.
-     * @returns void
-     * @example
-     * soundsService.playMetronome(0); // Plays the strong tick sound
-     */
-    playMetronome(beatCounter: number) {
-        BEAT_SOUNDS[beatCounter].play();
+        const playbackRate =
+            options.desiredReferenceA4Hz / target.referenceAudio.recordedReferenceA4Hz;
+        return playAndFade(audio, options.durationMs, options.gain, playbackRate);
     }
 
-    /**
-     * Plays the sounds for the given tempo.
-     * @param {AppBeat} tempo - The tempo object containing beat and measure information.
-     * @returns void
-     * @example
-     * soundsService.playSounds({ beat: 0, measure: 1 }); // Plays sounds for the first beat
-     */
-    playSounds(tempo: AppBeat) {
-        this.playMetronome(tempo.beat);// Play the metronome sound
-
-        if (tempo.beat == 0) {
-            if (tempo.measure == 1) {
-                this.playNoteSound(this.currentNote); // Play the note sound on the first beat of the measure
-            }
-        }
+    stopAll(): void {
+        Howler.stop();
     }
 
-    /**
-     * Sets the volume of the sounds.
-     * @param {number} volume - The volume level to set (0.0 to 1.0).
-     * @returns void
-     * @example
-     * soundsService.setVolume(0.5); // Sets the volume to 50%
-     */
-    setVolume(volume: number) {
-        this.volume = volume; // Update the volume level
+    setVolume(volume: number): void {
+        this.volume = volume;
+    }
+
+    private isLegacyInstrumentId(value: string): value is LegacyInstrumentId {
+        return value === 'trumpet' || value === 'clarinet' || value === 'oboe';
     }
 }

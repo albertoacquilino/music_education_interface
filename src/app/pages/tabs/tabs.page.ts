@@ -20,7 +20,6 @@ import {
   MAXREFFREQUENCY,
   MINREFFREQUENCY,
 } from 'src/app/constants';
-import { PitchService } from 'src/app/services/pitch.service';
 import { RefFreqService } from 'src/app/services/ref-freq.service';
 import { SoundsService } from 'src/app/services/sounds.service';
 import { addIcons } from 'ionicons';
@@ -61,7 +60,6 @@ export class TabsComponent implements OnInit, OnDestroy {
     private pickerController: PickerController,
     private refFrequencyService: RefFreqService,
     private soundsService: SoundsService,
-    private pitchService: PitchService,
   ) { }
   @ViewChild('tabs', { static: false }) tabs: IonTabs | undefined;
 
@@ -247,25 +245,9 @@ export class TabsComponent implements OnInit, OnDestroy {
   }
 
   async prepareTunerMedia() {
+    // The active activity controller acquires microphone access from the
+    // trusted Start gesture. The settings view only unlocks shared audio.
     await this.soundsService.unlockAudio();
-    const ua = navigator.userAgent;
-    const isiPhoneOrIPad = /iPhone|iPad|iPod/i.test(ua);
-    const isChromeOniOS = /CriOS/i.test(ua);
-
-    if (isiPhoneOrIPad && isChromeOniOS && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
-      alert('Chrome on iPhone/iPad requires HTTPS for microphone access. This local HTTP version may not allow the tuner. Please use Safari locally or test on a hosted HTTPS URL.');
-      return;
-    }
-
-    try {
-      await this.pitchService.primeMicrophoneAccess();
-    } catch (error) {
-      if (isiPhoneOrIPad && isChromeOniOS) {
-        alert('Chrome on iPhone/iPad requires HTTPS for microphone access. This local HTTP version may not allow the tuner. Please use Safari locally or test on a hosted HTTPS URL.');
-      } else {
-        alert('Unable to access the microphone in this browser. Please allow microphone access and try again.');
-      }
-    }
   }
 
   async openPicker(type: 'frequency') {
