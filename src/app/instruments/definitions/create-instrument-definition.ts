@@ -6,6 +6,7 @@ import {
   ReferenceAudioAsset,
   buildInstrumentNote
 } from '../instrument-definition';
+import { noteAssetName } from '../note-asset-name';
 
 interface DefinitionSource {
   readonly id: InstrumentId;
@@ -23,7 +24,7 @@ export function createInstrumentDefinition(source: DefinitionSource): Instrument
     const audioFile = source.audioFileForIndex?.(index, displayTokens[0])
       ?? displayTokens[0];
     const referenceAssetPath = (
-      `assets/sounds/${source.legacyId}_note_sounds/${audioFile}.m4a`
+      `assets/sounds/${source.legacyId}_note_sounds/${noteAssetName(audioFile)}.m4a`
     ) as ReferenceAudioAsset['path'];
 
     return buildInstrumentNote(

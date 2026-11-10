@@ -67,6 +67,7 @@ import {
   ActivitySessionService
 } from '../../core/activity/activity-session.service';
 import { scoreFromNote } from '../../utils/score.utils';
+import { noteAssetName } from '../../instruments/note-asset-name';
 
 @Component({
   selector: 'app-home',
@@ -601,7 +602,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   getNoteImg(note: number): string {
-    return `assets/images/clarinet_notes_images/_${this.NOTES[note]?.[0] ?? ''}.png`;
+    return `assets/images/clarinet_notes_images/_${noteAssetName(this.NOTES[note]?.[0] ?? '')}.png`;
   }
 
   async openPicker(type: 'frequency' | 'tempo'): Promise<void> {

@@ -146,10 +146,10 @@ describe('typed instrument definitions', () => {
     })).toThrow();
   });
 
-  it('uses an exact checked-in historical asset name for oboe G6', () => {
+  it('keeps the alternative oboe G6 recording as the active reference', () => {
     const oboeG6 = registry.get('oboe-c').notes
       .find(note => note.displayTokens[0] === 'G6')!;
     expect(oboeG6.referenceAudio.path)
-      .toBe('assets/sounds/oboe_note_sounds/G62.m4a');
+      .toBe('assets/sounds/oboe_note_sounds/G6_2.m4a');
   });
 });
