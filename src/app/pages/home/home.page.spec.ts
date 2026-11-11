@@ -23,6 +23,18 @@ describe('HomePage activity host', () => {
   let cdr: jasmine.SpyObj<ChangeDetectorRef>;
   let instruments: InstrumentRegistryService;
 
+  it('restores flute preferences and renders the selected non-transposing target', () => {
+    localStorage.setItem('selectedInstrument', 'flute');
+    page.ngOnInit();
+    expect(page.selectedInstrument).toBe('flute');
+    expect(page.NOTES.length).toBe(37);
+    const instrument = instruments.get('flute-c');
+    (page as any).renderFingering(instruments.resolveTarget('flute-c', instrument.notes[36].id, 450));
+    expect(page.flutePosition).toBe('assets/images/flute_positions/B6.svg');
+    expect(page.fluteAlt).toContain('B6');
+    page.ngOnDestroy();
+  });
+
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();

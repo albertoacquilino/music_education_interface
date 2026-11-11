@@ -180,6 +180,21 @@ describe('PrepareListenPlayController', () => {
     expect(audio.stopAll).toHaveBeenCalledTimes(1);
   });
 
+  it('selects flute range endpoints and preserves its reference and spelling through PLP', async () => {
+    const flute = context.instruments.get('flute-c');
+    context = { ...context, random: () => 0.999999 };
+    await controller.start({
+      ...config, instrumentId: flute.id, lowNoteId: flute.notes[0].id,
+      highNoteId: flute.notes[36].id, lowNoteIndex: 0, highNoteIndex: 36,
+      includeAccidentals: true, cycles: 1
+    }, context, new AbortController().signal);
+    clock.tick(12);
+    const result = await controller.whenSettled();
+    expect(result.presentedTargetIds).toEqual([flute.notes[36].id]);
+    expect(audio.playReference.calls.mostRecent().args[0].referenceAudio.path)
+      .toBe('assets/sounds/flute_note_sounds/B6.m4a');
+  });
+
   it('cancels without completion and releases every acquired resource once', async () => {
     await controller.start(config, context, new AbortController().signal);
     clock.tick(17);

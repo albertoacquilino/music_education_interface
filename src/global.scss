@@ -968,3 +968,37 @@ body.dark-theme ion-picker.tempo-picker-overlay .picker-opt.picker-opt-selected 
 body.dark-theme ion-modal.note-modal scroll-image-component img {
   filter: invert(1) !important;
 }
+// Full-width horizontal flute diagrams, isolated from the existing vertical layouts.
+@media (orientation: landscape) and (max-height: 500px) {
+  #main-content .wrapper.is-idle.is-flute {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  #main-content .wrapper.is-idle.is-flute .bottom { min-height: 0; overflow: auto; }
+  #main-content .wrapper.is-idle.is-flute .idle-instrument-display { container-type: normal; }
+}
+@media (orientation: landscape) {
+  #main-content .wrapper.is-playing.is-flute .stage-practice-group {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: auto;
+  }
+}
+@media (orientation: portrait) and (max-width: 1024px) {
+  #main-content .wrapper.is-playing.is-flute .exercise-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 64px auto minmax(160px, 1fr);
+    grid-template-areas: 'rail' 'instrument' 'notation';
+    overflow: auto;
+  }
+  #main-content .wrapper.is-playing.is-flute .stage-practice-group { display: contents; }
+  #main-content .wrapper.is-playing.is-flute .stage-instrument {
+    grid-area: instrument; container-type: normal; height: auto; overflow: visible;
+  }
+  #main-content .wrapper.is-playing.is-flute .exercise-rail--status { padding: 0; }
+  #main-content .wrapper.is-playing.is-flute .metronome-bullet {
+    flex-direction: row; padding: .25rem; gap: .5rem;
+  }
+  #main-content .wrapper.is-playing.is-flute .metronome-bullet h1 { font-size: 1.5rem; margin: 0; }
+}

@@ -16,10 +16,11 @@ describe('SoundsService explicit audio port', () => {
     expect(reference).not.toHaveBeenCalled();
   });
 
-  it('derives bounded reference playback rate from the selected A4', () => {
+  for (const instrumentId of ['oboe-c', 'flute-c'] as const) {
+  it('derives bounded reference playback rate for ' + instrumentId, () => {
     const service = new SoundsService();
     const registry = new InstrumentRegistryService();
-    const instrument = registry.get('oboe-c');
+    const instrument = registry.get(instrumentId);
     const note = instrument.notes.find(
       candidate => candidate.displayTokens[0] === 'A4'
     )!;
@@ -39,4 +40,5 @@ describe('SoundsService explicit audio port', () => {
 
     expect(audio.rate).toHaveBeenCalledOnceWith(450 / 440, 7);
   });
+  }
 });

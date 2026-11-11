@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { CLARINET_BB_INSTRUMENT } from './definitions/clarinet-bb.instrument';
 import { OBOE_C_INSTRUMENT } from './definitions/oboe-c.instrument';
 import { TRUMPET_BB_INSTRUMENT } from './definitions/trumpet-bb.instrument';
+import { FLUTE_C_INSTRUMENT } from './definitions/flute-c.instrument';
 import {
   InstrumentDefinition,
   InstrumentId,
@@ -34,7 +35,8 @@ export interface InstrumentRegistryPort {
 export const INSTRUMENT_DEFINITIONS: readonly InstrumentDefinition[] = [
   TRUMPET_BB_INSTRUMENT,
   CLARINET_BB_INSTRUMENT,
-  OBOE_C_INSTRUMENT
+  OBOE_C_INSTRUMENT,
+  FLUTE_C_INSTRUMENT
 ];
 
 @Injectable({

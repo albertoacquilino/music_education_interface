@@ -226,6 +226,6 @@ export class SoundsService implements AudioPort {
     }
 
     private isLegacyInstrumentId(value: string): value is LegacyInstrumentId {
-        return value === 'trumpet' || value === 'clarinet' || value === 'oboe';
+        return value === 'trumpet' || value === 'clarinet' || value === 'oboe' || value === 'flute';
     }
 }

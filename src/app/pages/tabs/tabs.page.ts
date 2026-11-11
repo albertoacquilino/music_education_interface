@@ -29,7 +29,7 @@ import {
 } from 'src/app/core/activity/activity-session.service';
 
 type ExerciseMode = 'instrument' | 'tuner';
-const INSTRUMENT_OPTIONS = ['trumpet', 'clarinet', 'oboe'] as const;
+const INSTRUMENT_OPTIONS = ['trumpet', 'clarinet', 'oboe', 'flute'] as const;
 
 @Component({
   selector: 'app-tabs',

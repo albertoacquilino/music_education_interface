@@ -68,6 +68,7 @@ import {
 } from '../../core/activity/activity-session.service';
 import { scoreFromNote } from '../../utils/score.utils';
 import { noteAssetName } from '../../instruments/note-asset-name';
+import { FluteFingeringComponent } from '../../components/flute-fingering/flute-fingering.component';
 
 @Component({
   selector: 'app-home',
@@ -82,7 +83,8 @@ import { noteAssetName } from '../../instruments/note-asset-name';
     TrumpetDiagramComponent,
     TempoSelectorComponent,
     NoteSelectorComponent,
-    ChromaticTunerComponent
+    ChromaticTunerComponent,
+    FluteFingeringComponent
   ]
 })
 export class HomePage implements OnInit, AfterViewInit, OnDestroy {
@@ -110,6 +112,8 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   currentBeat = -1;
   clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
   oboePosition = 'assets/images/oboe_positions/A4.svg';
+  flutePosition = 'assets/images/flute_positions/A4.svg';
+  fluteAlt = 'Flute fingering for A4';
   trumpetBtns: number[] = [];
   refFrequencyValue$ = 440;
   showIOSWebAudioHint = false;
@@ -123,7 +127,8 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   private readonly instrumentDisplayNames: Record<LegacyInstrumentId, string> = {
     trumpet: 'Trumpet',
     clarinet: 'Clarinet',
-    oboe: 'Oboe'
+    oboe: 'Oboe',
+    flute: 'Flute'
   };
 
   constructor(
@@ -315,6 +320,10 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       this.clarinetPosition = target.fingering.assetPath;
     } else if (target.instrumentId === 'oboe-c') {
       this.oboePosition = target.fingering.assetPath;
+    } else if (target.instrumentId === 'flute-c') {
+      this.flutePosition = target.fingering.assetPath;
+      this.fluteAlt = 'Flute fingering for ' + target.displayToken.replace(/([A-G])(\d)([sf])/, (_match, note, octave, accidental) =>
+        note + (accidental === 's' ? ' sharp ' : ' flat ') + octave);
     }
   }
 
@@ -353,6 +362,8 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private resetInstrumentVisual(): void {
+    this.flutePosition = 'assets/images/flute_positions/A4.svg';
+    this.fluteAlt = 'Flute fingering for A4';
     this.trumpetBtns = [];
     this.clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
     this.oboePosition = 'assets/images/oboe_positions/A4.svg';
@@ -382,7 +393,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     const savedMode = localStorage.getItem('mode');
     const savedInstrument = localStorage.getItem('selectedInstrument');
     const isInstrument = (value: string | null): value is LegacyInstrumentId =>
-      value === 'trumpet' || value === 'clarinet' || value === 'oboe';
+      value === 'trumpet' || value === 'clarinet' || value === 'oboe' || value === 'flute';
 
     let mode: 'instrument' | 'tuner' = 'instrument';
     let instrument: LegacyInstrumentId = 'trumpet';
@@ -439,7 +450,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
 
   selectInstrument(event: CustomEvent): void {
     const instrument = event.detail.value;
-    if (instrument !== 'trumpet' && instrument !== 'clarinet' && instrument !== 'oboe') {
+    if (instrument !== 'trumpet' && instrument !== 'clarinet' && instrument !== 'oboe' && instrument !== 'flute') {
       return;
     }
     this.selectedInstrument = instrument;

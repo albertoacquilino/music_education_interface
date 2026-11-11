@@ -323,6 +323,16 @@ export const OBOE_NOTES = [
     ['G6s', 'A6f'],
 ];
 
+/** Concert flute: B3–B6, written pitch equals sounding pitch. */
+export const FLUTE_NOTES = [
+    ['B3'], ['C4'], ['C4s', 'D4f'], ['D4'], ['E4f', 'D4s'], ['E4'],
+    ['F4'], ['F4s', 'G4f'], ['G4'], ['G4s', 'A4f'], ['A4'], ['B4f', 'A4s'],
+    ['B4'], ['C5'], ['C5s', 'D5f'], ['D5'], ['E5f', 'D5s'], ['E5'],
+    ['F5'], ['F5s', 'G5f'], ['G5'], ['G5s', 'A5f'], ['A5'], ['B5f', 'A5s'],
+    ['B5'], ['C6'], ['C6s', 'D6f'], ['D6'], ['E6f', 'D6s'], ['E6'],
+    ['F6'], ['F6s', 'G6f'], ['G6'], ['G6s', 'A6f'], ['A6'], ['B6f', 'A6s'], ['B6']
+];
+
 export const OBOE_POSITIONS = [
     'B3',
     'C4',

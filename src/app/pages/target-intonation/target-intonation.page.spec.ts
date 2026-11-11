@@ -12,6 +12,19 @@ import { InstrumentRegistryService } from '../../instruments/instrument-registry
 import { TargetIntonationPage } from './target-intonation.page';
 
 describe('TargetIntonationPage activity composition', () => {
+  for (const referenceA4Hz of [430, 440, 450]) {
+    it('starts flute B6 with an isolated 2100 Hz ceiling at A4=' + referenceA4Hz, async () => {
+      page.selectedInstrument = 'flute';
+      page.referenceA4Hz = referenceA4Hz;
+      page.lowNoteIndex = 36;
+      page.highNoteIndex = 36;
+      await page.start();
+      const config = session.start.calls.mostRecent().args[1];
+      expect(config.instrumentId).toBe('flute-c');
+      expect(config.detectorMaximumHz).toBe(2100);
+      expect(config.lowNoteId).toBe('flute-c:B6');
+    });
+  }
   let page: TargetIntonationPage;
   let session: {
     isActive: boolean;

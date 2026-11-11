@@ -165,7 +165,8 @@ export class TargetIntonationPage implements OnInit, OnDestroy {
       maximumAttemptsPerTarget:
         TARGET_INTONATION_DEFAULTS.maximumAttemptsPerTarget,
       detectorMinimumHz: TARGET_INTONATION_DEFAULTS.detectorMinimumHz,
-      detectorMaximumHz: TARGET_INTONATION_DEFAULTS.detectorMaximumHz
+      detectorMaximumHz: instrument.id === 'flute-c'
+        ? 2100 : TARGET_INTONATION_DEFAULTS.detectorMaximumHz
     };
 
     await this.activitySession.start(
@@ -307,6 +308,7 @@ export class TargetIntonationPage implements OnInit, OnDestroy {
       savedInstrument === 'trumpet'
       || savedInstrument === 'clarinet'
       || savedInstrument === 'oboe'
+      || savedInstrument === 'flute'
     ) {
       this.selectedInstrument = savedInstrument;
     }

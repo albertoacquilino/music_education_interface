@@ -6,8 +6,8 @@ import {
   spelledPitchToMidi
 } from '../core/music/pitch-math';
 
-export type InstrumentId = 'trumpet-bb' | 'clarinet-bb' | 'oboe-c';
-export type LegacyInstrumentId = 'trumpet' | 'clarinet' | 'oboe';
+export type InstrumentId = 'trumpet-bb' | 'clarinet-bb' | 'oboe-c' | 'flute-c';
+export type LegacyInstrumentId = 'trumpet' | 'clarinet' | 'oboe' | 'flute';
 
 export type FingeringRepresentation =
   | {
