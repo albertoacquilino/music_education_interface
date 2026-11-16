@@ -1,7 +1,9 @@
 ext {
+    // Shared native plugin override: supported with AGP 8.10 and Gradle 8.11.1.
+    kotlin_version = '2.2.21'
     minSdkVersion = 22
-    compileSdkVersion = 35
-    targetSdkVersion = 35
+    compileSdkVersion = 36
+    targetSdkVersion = 36
     androidxActivityVersion = '1.7.0'
     androidxAppCompatVersion = '1.6.1'
     androidxCoordinatorLayoutVersion = '1.2.0'
