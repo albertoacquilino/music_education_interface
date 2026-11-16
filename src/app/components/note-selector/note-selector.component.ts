@@ -9,8 +9,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnInit, Output, ViewChild } from '@angular/core';
 import { IonModal, IonicModule } from '@ionic/angular';
-import { TRUMPET_NOTES, CLARINET_NOTES,OBOE_NOTES } from 'src/app/constants';
+import { TRUMPET_NOTES, CLARINET_NOTES, OBOE_NOTES, FLUTE_NOTES } from 'src/app/constants';
 import { ScrollImageComponent } from '../scroll-image-selector/scroll-image-selector.component';
+import { noteAssetName } from '../../instruments/note-asset-name';
 
 /**
  * NoteSelectorComponent is responsible for displaying a note selector interface.
@@ -263,13 +264,15 @@ export class NoteSelectorComponent implements OnInit {
       notes = CLARINET_NOTES;
     } else if (this._selectedInstrument === 'oboe') {
       notes = OBOE_NOTES;
+    } else if (this._selectedInstrument === 'flute') {
+      notes = FLUTE_NOTES;
     } else if (this._selectedInstrument === 'tuner') {
       notes = TRUMPET_NOTES;
     } else {
       console.warn('Unknown instrument:', this._selectedInstrument);
       return;
     }
-    this.noteImages = notes.map(note => `assets/images/clarinet_notes_images/_${note[0]}.svg`);
+    this.noteImages = notes.map(note => `assets/images/clarinet_notes_images/_${noteAssetName(note[0])}.svg`);
   }
 
   /**

@@ -13,7 +13,12 @@ import "firebase/firestore";
 import { Device } from '@capacitor/device';
 import { DocumentReference, addDoc, collection, getDocs, getFirestore, updateDoc } from "firebase/firestore";
 import { Injectable } from "@angular/core";
-import { User, Activity } from "../models/firebase.types";
+import {
+  Activity,
+  TypedActivityResult,
+  TypedActivitySessionStart,
+  User
+} from "../models/firebase.types";
 import { query, where } from "@angular/fire/firestore";
 
 const firebaseConfig = {
@@ -112,6 +117,73 @@ export class FirebaseService {
     try {
       await this.saveActivity(this.currentActivity);
       // remove from local storage
+      this.removeFromLocalStorage(this.currentActivity);
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
+  }
+
+  /**
+   * Opens a versioned activity record while retaining the established
+   * offline-first local-storage and upload path.
+   */
+  public async saveTypedActivityStart(
+    envelope: TypedActivitySessionStart
+  ): Promise<void> {
+    const deviceInfo = await Device.getInfo();
+    const deviceId = await Device.getId();
+
+    this.currentActivity = {
+      // Legacy fields remain populated to keep historical readers total.
+      tempo: 0,
+      lowNote: Number(envelope.configuration['lowNoteIndex'] ?? 0),
+      highNote: Number(envelope.configuration['highNoteIndex'] ?? 0),
+      refFrequencyValue: Number(
+        envelope.configuration['referenceA4Hz'] ?? 440
+      ),
+      useFlatsAndSharps: Boolean(
+        envelope.configuration['includeAccidentals']
+      ),
+      useDynamics: false,
+      startTime: new Date(),
+      device: {
+        id: deviceId.identifier,
+        model: deviceInfo.model,
+        platform: deviceInfo.platform,
+        osVersion: deviceInfo.osVersion
+      },
+      schemaVersion: envelope.schemaVersion,
+      sessionId: envelope.sessionId,
+      activityId: envelope.activityId,
+      activityVersion: envelope.activityVersion,
+      instrumentId: envelope.instrumentId,
+      configuration: envelope.configuration,
+      sessionStartedAtMs: envelope.sessionStartedAtMs
+    };
+
+    this.saveToLocalStorage(this.currentActivity);
+  }
+
+  /**
+   * Persists aggregate target-intonation results. No raw audio or frame-level
+   * pitch estimates are accepted by the typed result contract.
+   */
+  public async saveTypedActivityStop(
+    result: TypedActivityResult
+  ): Promise<void> {
+    const endTime = new Date();
+    this.currentActivity = {
+      ...this.currentActivity,
+      action: result.outcome === 'completed' ? 'finished' : 'interrupted',
+      endTime,
+      duration:
+        (endTime.getTime() - this.currentActivity.startTime.getTime()) / 1000,
+      activityResult: result
+    };
+
+    this.updateInLocalStorage(this.currentActivity);
+    try {
+      await this.saveActivity(this.currentActivity);
       this.removeFromLocalStorage(this.currentActivity);
     } catch (e) {
       console.error("Error adding document: ", e);

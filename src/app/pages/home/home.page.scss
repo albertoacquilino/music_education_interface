@@ -70,6 +70,23 @@ ion-modal {
   overflow: hidden;
 }
 
+// Flute diagrams use their own natural horizontal ratio, never the vertical sizing rules.
+.wrapper.is-flute {
+  .idle-instrument-display { overflow: auto; }
+  .stage-instrument { overflow: auto; width: 100%; }
+  .stage-practice-group { min-width: 0; }
+  flute-fingering { width: 100%; flex: 0 0 auto; }
+}
+
+@media (orientation: portrait) and (max-width: 767px) {
+  .wrapper.is-flute .stage-practice-group {
+    display: flex;
+    flex-direction: column;
+  }
+  .wrapper.is-flute .stage-instrument { flex: 0 0 auto; height: auto; }
+  .wrapper.is-flute .stage-notation { flex: 1 1 auto; }
+}
+
 .idle-instrument-display {
   flex: 1 1 auto;
   min-height: 0;

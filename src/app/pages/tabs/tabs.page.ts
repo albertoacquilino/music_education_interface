@@ -20,14 +20,16 @@ import {
   MAXREFFREQUENCY,
   MINREFFREQUENCY,
 } from 'src/app/constants';
-import { PitchService } from 'src/app/services/pitch.service';
 import { RefFreqService } from 'src/app/services/ref-freq.service';
 import { SoundsService } from 'src/app/services/sounds.service';
 import { addIcons } from 'ionicons';
 import { close, musicalNote, musicalNotes, optionsOutline, pulseOutline, settingsOutline, textOutline, volumeHighOutline, moonOutline, eyeOutline, languageOutline } from 'ionicons/icons';
+import {
+  ActivitySessionService
+} from 'src/app/core/activity/activity-session.service';
 
 type ExerciseMode = 'instrument' | 'tuner';
-const INSTRUMENT_OPTIONS = ['trumpet', 'clarinet', 'oboe'] as const;
+const INSTRUMENT_OPTIONS = ['trumpet', 'clarinet', 'oboe', 'flute'] as const;
 
 @Component({
   selector: 'app-tabs',
@@ -61,7 +63,7 @@ export class TabsComponent implements OnInit, OnDestroy {
     private pickerController: PickerController,
     private refFrequencyService: RefFreqService,
     private soundsService: SoundsService,
-    private pitchService: PitchService,
+    private activitySession: ActivitySessionService,
   ) { }
   @ViewChild('tabs', { static: false }) tabs: IonTabs | undefined;
 
@@ -71,26 +73,35 @@ export class TabsComponent implements OnInit, OnDestroy {
       this.refFrequencyValue$ = value;
     });
     this.loadStateFromLocalStorage();
-    this.ensureExerciseRoute();
+    this.ensureActivityRoute();
     this.routerSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
-      .subscribe(() => this.ensureExerciseRoute());
+      .subscribe(() => this.ensureActivityRoute());
   }
 
   ngOnDestroy(): void {
     this.routerSub?.unsubscribe();
   }
 
-  private ensureExerciseRoute(): void {
-    if (!this.router.url.includes('/home/exercise')) {
-      void this.router.navigate(['/home', 'exercise'], { replaceUrl: true });
+  private ensureActivityRoute(): void {
+    if (this.router.url.includes('/home/intonation')) {
+      this.exerciseMode = 'tuner';
+    } else if (this.router.url.includes('/home/exercise')) {
+      this.exerciseMode = 'instrument';
+    } else {
+      const route = this.exerciseMode === 'tuner' ? 'intonation' : 'exercise';
+      void this.router.navigate(['/home', route], { replaceUrl: true });
     }
     void this.syncIonTabsSelection();
   }
 
   private async syncIonTabsSelection(): Promise<void> {
     try {
-      await this.tabs?.select('exercise');
+      await this.tabs?.select(
+        this.router.url.includes('/home/intonation')
+          ? 'intonation'
+          : 'exercise'
+      );
     } catch {
       // Tab may already be selected or tabs not ready yet.
     }
@@ -101,13 +112,15 @@ export class TabsComponent implements OnInit, OnDestroy {
   }
 
   isInstrumentSelectDisabled(): boolean {
-    return this.exerciseMode === 'tuner';
+    return false;
   }
 
   onTabsChange(event: { detail?: { tab?: string }; tab?: string }) {
     const tabId = event.detail?.tab ?? event.tab;
-    if (tabId === 'exercise' && !this.router.url.includes('/home/exercise')) {
-      void this.router.navigate(['/home', 'exercise']);
+    if (tabId === 'exercise') {
+      this.exerciseMode = 'instrument';
+    } else if (tabId === 'intonation') {
+      this.exerciseMode = 'tuner';
     }
   }
 
@@ -197,8 +210,22 @@ export class TabsComponent implements OnInit, OnDestroy {
       await this.prepareExerciseMedia();
     }
 
+    await this.openActivity(mode);
+  }
+
+  async openActivity(mode: ExerciseMode): Promise<void> {
+    const route = mode === 'tuner' ? 'intonation' : 'exercise';
+    if (this.router.url.includes(`/home/${route}`)) {
+      return;
+    }
+
+    if (this.activitySession.isActive) {
+      await this.activitySession.cancel('superseded');
+    }
+    this.exerciseMode = mode;
     this.saveStateToLocalStorage();
     this.emitSettingsUpdated();
+    await this.router.navigate(['/home', route]);
   }
 
   selectInstrument(event: CustomEvent) {
@@ -247,25 +274,9 @@ export class TabsComponent implements OnInit, OnDestroy {
   }
 
   async prepareTunerMedia() {
+    // The active activity controller acquires microphone access from the
+    // trusted Start gesture. The settings view only unlocks shared audio.
     await this.soundsService.unlockAudio();
-    const ua = navigator.userAgent;
-    const isiPhoneOrIPad = /iPhone|iPad|iPod/i.test(ua);
-    const isChromeOniOS = /CriOS/i.test(ua);
-
-    if (isiPhoneOrIPad && isChromeOniOS && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
-      alert('Chrome on iPhone/iPad requires HTTPS for microphone access. This local HTTP version may not allow the tuner. Please use Safari locally or test on a hosted HTTPS URL.');
-      return;
-    }
-
-    try {
-      await this.pitchService.primeMicrophoneAccess();
-    } catch (error) {
-      if (isiPhoneOrIPad && isChromeOniOS) {
-        alert('Chrome on iPhone/iPad requires HTTPS for microphone access. This local HTTP version may not allow the tuner. Please use Safari locally or test on a hosted HTTPS URL.');
-      } else {
-        alert('Unable to access the microphone in this browser. Please allow microphone access and try again.');
-      }
-    }
   }
 
   async openPicker(type: 'frequency') {

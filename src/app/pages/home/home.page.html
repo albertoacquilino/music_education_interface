@@ -9,7 +9,7 @@
 <div class="ion-page" id="main-content">
   <ion-content [fullscreen]="true" [scrollY]="false">
     <div id="container" class="app-viewport">
-      <div class="wrapper" id="wrapper" [class.is-playing]="isPlaying()" [class.is-idle]="!isPlaying()">
+      <div class="wrapper" id="wrapper" [class.is-playing]="isPlaying()" [class.is-idle]="!isPlaying()" [class.is-flute]="selectedInstrument === 'flute'">
 
         <!-- IDLE STATE: setup screen (unchanged) -->
         <ng-container *ngIf="!isPlaying()">
@@ -17,9 +17,13 @@
             <div class="idle-instrument-display"
               [class.is-vertical-instrument]="!isTunerExercise() && (selectedInstrument === 'clarinet' || selectedInstrument === 'oboe')">
               <ng-container *ngIf="isTunerExercise(); else idleInstrumentDiagram">
-                <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+                <chromatic-tuner
+                  [refFrequencyValue$]="refFrequencyValue$"
+                  [pitchHz]="tunerPitchHz"
+                ></chromatic-tuner>
               </ng-container>
               <ng-template #idleInstrumentDiagram>
+                <flute-fingering *ngIf="selectedInstrument === 'flute'" [src]="flutePosition" [alt]="fluteAlt"></flute-fingering>
                 <ng-container *ngIf="selectedInstrument === 'trumpet'">
                   <trumpet-diagram [trumpetButtons]="trumpetBtns"></trumpet-diagram>
                 </ng-container>
@@ -42,8 +46,8 @@
           <aside class="exercise-rail exercise-rail--status surface-panel" aria-label="Beat and phase">
             <div class="metronome status-panel">
               <div class="metronome-bullet">
-                <h1 id="metronome-label" *ngIf="beat$|async as beat">
-                  {{ beat.beat >= 0 ? (beat.beat + 1): '&nbsp;'}}
+                <h1 id="metronome-label">
+                  {{ currentBeat >= 0 ? (currentBeat + 1): '&nbsp;'}}
                 </h1>
                 <semaphore-light [currentAction]="currentAction"></semaphore-light>
               </div>
@@ -56,10 +60,14 @@
               aria-label="Instrument">
               <ng-container *ngIf="isTunerExercise(); else playingInstrumentDiagram">
                 <div class="chromatic-tuner visual-panel">
-                  <chromatic-tuner [refFrequencyValue$]="refFrequencyValue$"></chromatic-tuner>
+                  <chromatic-tuner
+                    [refFrequencyValue$]="refFrequencyValue$"
+                    [pitchHz]="tunerPitchHz"
+                  ></chromatic-tuner>
                 </div>
               </ng-container>
               <ng-template #playingInstrumentDiagram>
+                <flute-fingering *ngIf="selectedInstrument === 'flute'" [src]="flutePosition" [alt]="fluteAlt"></flute-fingering>
                 <ng-container *ngIf="selectedInstrument === 'trumpet'">
                   <div class="trumpet visual-panel">
                     <trumpet-diagram [trumpetButtons]="trumpetBtns"></trumpet-diagram>
