@@ -4,6 +4,8 @@
   "author": "Ionic Framework",
   "homepage": "https://ionicframework.com/",
   "scripts": {
+    "postinstall": "node scripts/patch-ios-device.cjs",
+    "precap:sync:ios": "node scripts/patch-ios-device.cjs",
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
@@ -35,7 +37,7 @@
     "@capacitor/android": "6.2.3",
     "@capacitor/app": "6.0",
     "@capacitor/core": "6.2.3",
-    "@capacitor/device": "6.0",
+    "@capacitor/device": "6.0.1",
     "@capacitor/haptics": "6.0",
     "@capacitor/ios": "6.2.3",
     "@capacitor/keyboard": "6.0",

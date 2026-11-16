@@ -40,11 +40,9 @@ These commands do not override the deployment target. An unsigned archive demons
 
 ## Privacy and distribution review still required
 
-Capacitor and CapacitorCordova supply framework privacy manifests with empty required-reason lists. The installed Device 6.0.1 plugin calls disk-space APIs in `getInfo()` and supplies no privacy manifest. The application calls `Device.getInfo()` in its Firebase service but retains only model/platform/OS fields (disk-space results are discarded).
+The Device disk-space issue identified during modernization is addressed by a version-checked, reproducible iOS source patch. See [Device privacy patch](ios-device-privacy.md) for its scope, optional-field behavior, installation requirements, archive checks and remaining privacy obligations. No speculative privacy declaration was added; existing telemetry is preserved.
 
-Capacitor's Device documentation requires a disk-space declaration and suggests reason 85F4.1. This update does not invent a reason or claim that incidental disk-space querying meets a user-visible purpose. Apple requires accurate reasons and declarations in the bundle containing the relevant SDK code; adding an arbitrary app manifest is not proof of compliance. Resolve the Device API/SDK manifest issue in a separately reviewed change, and verify the final archive privacy report before upload. No new privacy/data-collection claims were made here. Existing device identifiers/exercise telemetry also need accurate store privacy disclosures.
-
-Static analysis reports warnings in unchanged `CAPPlugin.m` (self initialization) and `Keyboard.m` (uninitialized values). Compilation succeeds, but these findings need plugin-level review; no dependency source was patched. Existing API deprecations, CocoaPods script output warnings and optional AppIntents metadata messages are also reported.
+Static analysis reports warnings in unchanged `CAPPlugin.m` (self initialization) and `Keyboard.m` (uninitialized values). Compilation succeeds, but these findings need plugin-level review; those dependency sources were not patched. Existing API deprecations, CocoaPods script output warnings and optional AppIntents metadata messages are also reported.
 
 Before TestFlight: verify Apple account access, signing/provisioning, agreements, an unused build number, export compliance, final bundle validation and privacy disclosures. Test microphone permission allow/deny, Web Audio unlock, all four instruments/calibration/Profile C, silent mode/speaker/headphones/Bluetooth, calls/background/resume and low-vision layouts on physical devices. Browser tests and unsigned builds do not establish these runtime behaviors.
 

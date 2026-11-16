@@ -1,0 +1,12 @@
+[
+  {
+    "path": "ios/Sources/DevicePlugin/Device.swift",
+    "original": "98f8196b3d842bcb4ea0d141d026843de962770270abe7c136906ddda1989b33",
+    "patched": "bf6214349dbe8812847f02e819690e7a4c030b1fbe4ffc4ca7dd436a005ff4b4"
+  },
+  {
+    "path": "ios/Sources/DevicePlugin/DevicePlugin.swift",
+    "original": "188b44efe0b19f273d3f118c20b60ebd3802f45f5f3419125cebd4918036ca6d",
+    "patched": "fc6f4988997d2f3a8b1cb109c2cda300177f7b8b18192b6be5e71029edaac5f6"
+  }
+]
