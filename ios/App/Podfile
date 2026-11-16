@@ -1,6 +1,7 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '13.0'
+minimum_ios_version = '15.0'
+platform :ios, minimum_ios_version
 use_frameworks!
 
 # workaround to avoid Xcode caching of Pods that requires
@@ -29,6 +30,14 @@ end
 post_install do |installer|
   assertDeploymentTarget(installer)
   installer.pods_project.targets.each do |target|
+    # Capacitor's helper enforces only iOS 13; align every generated pod target
+    # with this application's minimum without lowering any higher requirement.
+    target.build_configurations.each do |config|
+      deployment_target = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if deployment_target.nil? || Gem::Version.new(deployment_target) < Gem::Version.new(minimum_ios_version)
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = minimum_ios_version
+      end
+    end
     if target.respond_to?(:product_type) and target.product_type == "com.apple.product-type.bundle"
       target.build_configurations.each do |config|
           config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
