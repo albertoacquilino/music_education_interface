@@ -33,6 +33,7 @@ export interface AudioPlayback {
 }
 
 export interface ReferencePlaybackOptions {
+  readonly plpDynamic?: 'p' | 'mf' | 'f';
   readonly durationMs: number;
   readonly gain: number;
   readonly desiredReferenceA4Hz: number;
@@ -40,7 +41,9 @@ export interface ReferencePlaybackOptions {
 
 export interface AudioPort {
   unlockFromUserGesture(): Promise<void>;
-  preloadInstrument(instrument: InstrumentDefinition): Promise<void>;
+  preloadInstrument(instrument: InstrumentDefinition, options?: {
+    expressiveDynamics: boolean; referenceA4Hz: number;
+  }): Promise<void>;
   playMetronome(accent: 'strong' | 'weak'): AudioPlayback;
   playReference(
     target: NoteTarget,

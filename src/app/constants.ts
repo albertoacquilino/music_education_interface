@@ -1,3 +1,5 @@
+import { DYNAMICS_LEVELS } from './core/music/dynamics-profiles';
+
 /**
  * This file is part of the Music Education Interface project.
  * Copyright (C) 2025 Alberto Acquilino
@@ -176,8 +178,8 @@ export const TRUMPET_BTN = [
  * @constant {Object[]}
  */
 export const DYNAMICS = [
-    { label: 'p', volume: 0.15 }, // Piano
-    { label: 'mf', volume: 0.4 }, // Mezzo-forte
+    { label: 'p', volume: DYNAMICS_LEVELS.p }, // Gain-only fallback; normal playback compensates EQ per note.
+    { label: 'mf', volume: DYNAMICS_LEVELS.mf },
     { label: 'f', volume: 1.0 },  // Forte
 ];
 

@@ -1,4 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
+import { DYNAMICS_LEVELS } from '../../core/music/dynamics-profiles';
 import {
   ActivityContext,
   AudioPlayback,
@@ -195,6 +196,21 @@ describe('PrepareListenPlayController', () => {
       .toBe('assets/sounds/flute_note_sounds/B6.m4a');
   });
 
+  for (const [random, label] of [[0, 'p'], [.5, 'mf'], [.99999, 'f']] as const) {
+    it('selects and notates ' + label + ' while explicitly requesting PLP dynamics', async () => {
+      context = { ...context, random: () => random };
+      await controller.start({ ...config, cycles: 1, useDynamics: true }, context, new AbortController().signal);
+      clock.tick(12); await controller.whenSettled();
+      const options = audio.playReference.calls.mostRecent().args[1];
+      expect(options.plpDynamic).toBe(label);
+      expect(options.gain).toBe(DYNAMICS_LEVELS[label]);
+      expect(options.durationMs).toBe(3000);
+      expect(audio.playReference).toHaveBeenCalledTimes(1);
+      expect(audio.preloadInstrument).toHaveBeenCalledWith(context.instruments.get(config.instrumentId),
+        { expressiveDynamics: true, referenceA4Hz: 440 });
+    });
+  }
+
   it('cancels without completion and releases every acquired resource once', async () => {
     await controller.start(config, context, new AbortController().signal);
     clock.tick(17);
@@ -242,6 +258,7 @@ describe('PrepareListenPlayController', () => {
     expect(audio.playReference).toHaveBeenCalledTimes(1);
     const referenceOptions = audio.playReference.calls.mostRecent().args[1];
     expect(referenceOptions.durationMs).toBe(3000);
+    expect(referenceOptions.plpDynamic).toBeUndefined();
     expect(referenceOptions.desiredReferenceA4Hz).toBe(440);
   });
 

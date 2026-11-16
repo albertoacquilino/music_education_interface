@@ -87,7 +87,9 @@ export class PrepareListenPlayController implements LearningActivityController<
     try {
       const instrument = context.instruments.get(config.instrumentId);
       await context.audio.unlockFromUserGesture();
-      await context.audio.preloadInstrument(instrument);
+      await context.audio.preloadInstrument(instrument, {
+        expressiveDynamics: config.useDynamics, referenceA4Hz: config.referenceA4Hz
+      });
 
       if (config.pitchDisplay !== 'off') {
         this.pitchSession = await context.pitch.acquire(signal);
@@ -248,6 +250,8 @@ export class PrepareListenPlayController implements LearningActivityController<
       this.context.audio.playReference(this.currentMaterial.target, {
         durationMs: ticksPerPhase * (60000 / this.config.tempoBpm),
         gain: this.currentMaterial.dynamicGain,
+        plpDynamic: this.config.useDynamics
+          ? this.currentMaterial.dynamic as 'p' | 'mf' | 'f' : undefined,
         desiredReferenceA4Hz: this.config.referenceA4Hz
       });
     }

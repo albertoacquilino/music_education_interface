@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dynamics listening comparisons</title>
+<style>
+body{font:16px system-ui;margin:0 auto;max-width:1000px;padding:20px;color:#17212f;background:#f6f8fb}
+h1{font-size:1.65rem}button,select{font:inherit;padding:10px;border:1px solid #728198;border-radius:8px;background:white}
+header{position:sticky;top:0;background:#f6f8fb;padding:8px 0;z-index:1}
+article{border:1px solid #cdd5df;border-radius:12px;padding:16px;margin:20px 0;background:white}
+.clips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+audio{width:100%}.clip{min-width:0}summary{cursor:pointer;padding:12px 0;font-weight:600}
+pre{font-size:12px;white-space:pre-wrap}a{display:inline-block;margin:8px 0;color:#1257a6}
+.note{font-size:.9rem;color:#455469}#status{padding:12px 0}
+</style>
+<h1>Dynamics listening comparisons</h1>
+<p>Select A (original), B (current mobile-first), or C (intermediate).
+Production uses C. Switching profiles here does not change the application.
+These are approximate timbral simulations.</p>
+<p class="note">Use actual playback levels to compare contrast; use RMS-matched clips to focus on tone.
+RMS matching is a loudness proxy, not a subjective match or gated LUFS.
+The speaker approximation is a comparison-only mono 350 Hz high-pass / 6.5 kHz low-pass (Q=.707).
+It does not represent a specific phone or establish real device audibility.
+All matched clips are attenuated, not boosted; speaker clips share per-note headroom scaling.
+No microphone is used. The original recordings are unchanged.</p>
+<header>
+<label>Calibration <select id="profile">
+<option value="A">A — Original</option>
+<option value="B">B — Mobile-first reference</option>
+<option value="C" selected>C — Production intermediate (−6 / −12 dB output)</option>
+</select></label>
+<p id="parameters" class="note"></p>
+<button id="render">Render listening clips</button>
+<button id="stop">Stop playback</button>
+<label><input id="phone" type="checkbox" checked> Include speaker approximation</label>
+<div id="status" role="status">Ready to render 12 notes across four instruments.</div>
+</header>
+<main id="results"></main>
+<script type="module">
+import { settings, renderClip } from '/comparison-profiles.js';
+import { compensatedDynamicsGain } from '/dynamics-profiles.js';
+const button=document.querySelector('#render'),status=document.querySelector('#status');
+const urls=[];
+const decoded=new Map(),renderedCache=new Map();
+const reports={};
+const names={A:'Original',B:'Mobile-first reference',C:'Production intermediate'};
+document.querySelector('#profile').onchange=()=>button.onclick();
+document.querySelector('#stop').onclick=()=>document.querySelectorAll('audio').forEach(a=>a.pause());
+document.addEventListener('play',event=>{
+  document.querySelectorAll('audio').forEach(a=>{if(a!==event.target)a.pause();});
+},true);
+function wav(buffer){
+  const n=buffer.length,c=buffer.numberOfChannels,b=new ArrayBuffer(44+n*c*2),v=new DataView(b);
+  const str=(at,s)=>[...s].forEach((x,i)=>v.setUint8(at+i,x.charCodeAt(0)));
+  str(0,'RIFF');v.setUint32(4,b.byteLength-8,true);str(8,'WAVE');str(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,c,true);v.setUint32(24,buffer.sampleRate,true);
+  v.setUint32(28,buffer.sampleRate*c*2,true);v.setUint16(32,c*2,true);v.setUint16(34,16,true);
+  str(36,'data');v.setUint32(40,n*c*2,true);
+  for(let i=0;i<n;i++)for(let k=0;k<c;k++)v.setInt16(44+(i*c+k)*2,Math.max(-1,Math.min(1,buffer.getChannelData(k)[i]))*32767,true);
+  return new Blob([b],{type:'audio/wav'});
+}
+function measures(buffer){
+  let sum=0,peak=0,diff=0,n=0;
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const full=buffer.getChannelData(c);for(const x of full)peak=Math.max(peak,Math.abs(x));
+    const a=full.slice(12000,36000);n+=a.length;
+    for(let i=0;i<a.length;i++){sum+=a[i]*a[i];if(i)diff+=(a[i]-a[i-1])**2;}
+  }
+  return {rms:Math.sqrt(sum/n),peak,brightness:diff/sum,frames:buffer.length};
+}
+async function phone(buffer){
+  const ctx=new OfflineAudioContext(1,buffer.length,buffer.sampleRate),s=ctx.createBufferSource();
+  s.buffer=buffer;const hp=ctx.createBiquadFilter(),lp=ctx.createBiquadFilter();
+  hp.type='highpass';hp.frequency.value=350;hp.Q.value=.707;
+  lp.type='lowpass';lp.frequency.value=6500;lp.Q.value=.707;
+  s.connect(hp).connect(lp).connect(ctx.destination);s.start();return ctx.startRendering();
+}
+function addClip(parent,note,dynamic,buffer,base,mode,gain=1,calibration){
+  const output=new AudioBuffer({length:buffer.length,numberOfChannels:buffer.numberOfChannels,sampleRate:buffer.sampleRate});
+  for(let c=0;c<buffer.numberOfChannels;c++){const a=buffer.getChannelData(c),b=output.getChannelData(c);for(let i=0;i<a.length;i++)b[i]=a[i]*gain;}
+  const m=measures(output),row=document.createElement('div');row.className='clip';
+  const title=document.createElement('h3');title.textContent=dynamic+' · '+(20*Math.log10(m.rms/base.rms)).toFixed(2)+' dB vs f';row.append(title);
+  const url=URL.createObjectURL(wav(output));urls.push(url);
+  const audio=document.createElement('audio');audio.controls=true;audio.src=url;
+  audio.setAttribute('aria-label',note.instrument+' '+note.token+' '+mode+' '+dynamic);row.append(audio);
+  const link=document.createElement('a');link.href=url;link.download=document.querySelector('#profile').value+'-'+note.instrument+'-'+note.token+'-'+mode+'-'+dynamic+'.wav';link.textContent='Download WAV';row.append(link);
+  const detail=document.createElement('details'),summary=document.createElement('summary');
+  summary.textContent='Measurements';detail.append(summary);
+  const data=document.createElement('pre');data.dataset.mode=mode;data.dataset.dynamic=dynamic;
+  data.textContent=JSON.stringify({...m,levelDb:20*Math.log10(m.rms/base.rms),
+    brightnessRatio:m.brightness/base.brightness,comparisonGain:gain,
+    calibration:dynamic==='f'?'bypass':calibration},null,2);
+  detail.append(data);row.append(detail);parent.append(row);
+}
+button.onclick=async()=>{
+  const selector=document.querySelector('#profile'),profile=selector.value;selector.disabled=true;
+  document.querySelector('#parameters').textContent=profile==='A'?'A: gains 1 / .4 / .15; original shelves; no low-register depth protection.':
+    profile==='B'?'B: gains 1 / .668344 / .421697; current gentle shelves and low-register protection.':
+    'C: EQ depth halfway between A and B; per-note comparison gain calculated after EQ for −6 / −12 dB steady-window stereo RMS.';
+  button.disabled=true;document.querySelector('#stop').click();
+  urls.splice(0).forEach(URL.revokeObjectURL);document.querySelector('#results').replaceChildren();
+  const includePhone=document.querySelector('#phone').checked;
+  try{
+    const response=await fetch('/notes.json');if(!response.ok)throw Error('Cannot load note list');
+    const notes=await response.json();let count=0;const report=[];
+    for(const note of notes){
+      status.textContent='Rendering '+note.instrument+' '+note.token+'…';
+      const article=document.createElement('article'),heading=document.createElement('h2');article.dataset.note=note.instrument+':'+note.token;
+      heading.textContent=profile+' '+names[profile]+' · '+note.instrument+' · '+note.token;article.append(heading);
+      document.querySelector('#results').append(article);
+      if(!decoded.has(note.path)){
+        const asset=await fetch('/'+note.path);if(!asset.ok)throw Error('Missing '+note.path);
+        const ctx=new OfflineAudioContext(2,96000,48000);
+        decoded.set(note.path,await ctx.decodeAudioData(await asset.arrayBuffer()));
+      }
+      const key=profile+note.path;
+      if(!renderedCache.has(key)){
+        const clips=[];
+        for(const dynamic of ['f','mf','p']){
+          const clip=await renderClip(decoded.get(note.path),note,profile,dynamic);
+          if(profile==='C'&&dynamic!=='f'){
+            const base=measures(clips[0].buffer),m=measures(clip.buffer);
+            const correction=compensatedDynamicsGain(base.rms,m.rms,dynamic);
+            if(correction>1)throw Error('Intermediate target would require boost');
+            clip.settings.gain=correction;
+            for(let c=0;c<clip.buffer.numberOfChannels;c++){
+              const data=clip.buffer.getChannelData(c);for(let i=0;i<data.length;i++)data[i]*=correction;
+            }
+          }
+          clips.push(clip);
+        }
+        renderedCache.set(key,clips);
+      }
+      const clips=renderedCache.get(key),rendered=clips.map(c=>c.buffer);
+      const base=measures(rendered[0]);
+      report.push({note:note.instrument+' '+note.token,levels:rendered.map((buf,i)=>({
+        dynamic:['f','mf','p'][i],...measures(buf),levelDb:20*Math.log10(measures(buf).rms/base.rms),settings:clips[i].settings}))});
+      for(const mode of includePhone?['production','speaker-approx']:['production']){
+        const buffers=mode==='production'?rendered:await Promise.all(rendered.map(phone));
+        const metrics=buffers.map(measures),target=Math.min(...metrics.map(m=>m.rms));
+        const headroom=mode==='production'?1:Math.min(1,.95/Math.max(...metrics.map(m=>m.peak)));
+        for(const matched of [false,true]){
+          const section=document.createElement('details');section.open=mode==='production'&&!matched;
+          const label=document.createElement('summary');
+          label.textContent=(mode==='production'?'Actual playback levels':'Speaker approximation')+(matched?' — RMS matched (comparison only)':'');
+          section.append(label);const clipGrid=document.createElement('div');clipGrid.className='clips';section.append(clipGrid);article.append(section);
+          for(let i=0;i<3;i++){
+            addClip(clipGrid,note,['f','mf','p'][i],buffers[i],
+              {...metrics[0],rms:(matched?target:metrics[0].rms)*headroom},
+              mode+(matched?'-RMS-matched':''),headroom*(matched?target/metrics[i].rms:1),clips[i].settings);
+            count++;
+          }
+        }
+      }
+    }
+    reports[profile]=report;
+    let reportNode=document.querySelector('#validation-report');
+    if(!reportNode){reportNode=document.createElement('pre');reportNode.id='validation-report';const detail=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Validation report for rendered profiles';detail.append(summary,reportNode);document.querySelector('#results').append(detail);}
+    reportNode.textContent=JSON.stringify(reports,null,2);
+    status.textContent='Ready: profile '+profile+' · '+count+' clips. Switch calibration above; no reload needed.';
+    button.textContent='Regenerate clips';
+  }catch(error){status.textContent='Could not render: '+error.message;console.error(error);}
+  finally{button.disabled=false;selector.disabled=false;}
+};
+</script>
+</html>

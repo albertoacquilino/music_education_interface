@@ -20,6 +20,8 @@ import {
     NoteTarget
 } from '../instruments/instrument-definition';
 import { INSTRUMENT_DEFINITIONS } from '../instruments/instrument-registry.service';
+import { ExpressiveDynamicsPlayer, calibrateReferenceDynamics } from './expressive-dynamics';
+import { SoftDynamic } from '../core/music/dynamics-profiles';
 
 export const BEAT_SOUNDS = [
     new Howl({ src: ['assets/sounds/tick_strong.m4a'] }),
@@ -61,6 +63,11 @@ function playAndFade(
     providedIn: 'root'
 })
 export class SoundsService implements AudioPort {
+    private readonly expressive = new ExpressiveDynamicsPlayer();
+    private expressiveGeneration = 0;
+    private expressiveNotes = new Map<string, {
+        buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number;
+    }>();
     private selectedInstrument: LegacyInstrumentId = 'trumpet';
     private preloadedNotes = new Map<string, Howl>();
     private preloadVersion = 0;
@@ -154,6 +161,9 @@ export class SoundsService implements AudioPort {
         }
 
         this.selectedInstrument = instrument;
+        this.expressiveGeneration++;
+        this.expressive.stopAll();
+        this.expressiveNotes.clear();
         this.preloadedNotes = new Map();
         this.preloadTask = this.preloadSounds();
         return this.preloadTask;
@@ -191,8 +201,36 @@ export class SoundsService implements AudioPort {
         return this.unlockAudio();
     }
 
-    preloadInstrument(instrument: InstrumentDefinition): Promise<void> {
-        return this.setInstrument(instrument.legacyId);
+    async preloadInstrument(instrument: InstrumentDefinition, options?: {
+        expressiveDynamics: boolean; referenceA4Hz: number;
+    }): Promise<void> {
+        const preload = this.setInstrument(instrument.legacyId);
+        const generation = ++this.expressiveGeneration;
+        await preload;
+        if (!options?.expressiveDynamics || !Howler.usingWebAudio || !Howler.ctx
+            || generation !== this.expressiveGeneration) { return; }
+        const notes = new Map<string, {
+            buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number;
+        }>();
+        // Bound memory/concurrency on mobile; prepare before the timer starts.
+        for (const note of instrument.notes) {
+            if (generation !== this.expressiveGeneration) { return; }
+            try {
+                const response = await fetch(note.referenceAudio.path);
+                if (generation !== this.expressiveGeneration) { return; }
+                if (!response.ok) { throw new Error('HTTP ' + response.status); }
+                const context = new OfflineAudioContext(2, 96000, 48000);
+                const buffer = await context.decodeAudioData(await response.arrayBuffer());
+                if (generation !== this.expressiveGeneration) { return; }
+                const rate = options.referenceA4Hz / note.referenceAudio.recordedReferenceA4Hz;
+                const hz = note.referenceAudio.recordedSoundingFrequencyHz * rate;
+                const gains = await calibrateReferenceDynamics(buffer, instrument.id, hz, rate);
+                notes.set(note.id, { buffer, gains, referenceA4Hz: options.referenceA4Hz });
+            } catch (error) {
+                console.warn('Expressive dynamics unavailable; using gain-only playback:', note.id, error);
+            }
+        }
+        if (generation === this.expressiveGeneration) { this.expressiveNotes = notes; }
     }
 
     playMetronome(accent: 'strong' | 'weak'): AudioPlayback {
@@ -214,10 +252,21 @@ export class SoundsService implements AudioPort {
 
         const playbackRate =
             options.desiredReferenceA4Hz / target.referenceAudio.recordedReferenceA4Hz;
+        const prepared = this.expressiveNotes.get(target.noteId);
+        if ((options.plpDynamic === 'mf' || options.plpDynamic === 'p')
+            && prepared?.referenceA4Hz === options.desiredReferenceA4Hz
+            && Howler.usingWebAudio && Howler.ctx && Howler.masterGain) {
+            return this.expressive.play(Howler.ctx, Howler.masterGain, prepared.buffer,
+                target.instrumentId, target.expectedSoundingFrequencyHz, options.plpDynamic,
+                prepared.gains[options.plpDynamic], playbackRate, options.durationMs);
+        }
         return playAndFade(audio, options.durationMs, options.gain, playbackRate);
     }
 
     stopAll(): void {
+        this.expressiveGeneration++;
+        this.expressive.stopAll();
+        this.expressiveNotes.clear();
         Howler.stop();
     }
 
