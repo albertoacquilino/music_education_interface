@@ -1,11 +1,11 @@
 PODS:
-  - Capacitor (6.0.0):
+  - Capacitor (6.2.3):
     - CapacitorCordova
   - CapacitorApp (6.0.1):
     - Capacitor
   - CapacitorCommunityKeepAwake (5.0.1):
     - Capacitor
-  - CapacitorCordova (6.0.0)
+  - CapacitorCordova (6.2.3)
   - CapacitorDevice (6.0.1):
     - Capacitor
   - CapacitorHaptics (6.0.1):
@@ -54,10 +54,10 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@mozartec/capacitor-microphone"
 
 SPEC CHECKSUMS:
-  Capacitor: 559d073c4ca6c27f8e7002c807eea94c3ba435a9
+  Capacitor: 0ccf62a00a8a5d696cfcd9e52d2935571925df8d
   CapacitorApp: 0bc633b4eae40a1f32cd2834788fad3bc42da6a1
   CapacitorCommunityKeepAwake: e2ddd50812e3407f8dc3a2c28e97d66e9b59b2f5
-  CapacitorCordova: 8c4bfdf69368512e85b1d8b724dd7546abeb30af
+  CapacitorCordova: 80f92d91cf553071baa7b16c7b558578e8a84291
   CapacitorDevice: 7097a1deb4224b77fd13a6e60a355d0062a5d772
   CapacitorHaptics: fe689ade56ef20ec9b041a753c6da70c5d8ec9a9
   CapacitorKeyboard: 2700f9b18687be021e28b5a09b59eb151a46d5e0
