@@ -109,6 +109,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   currentNote = INITIAL_NOTE;
   score: Score = scoreFromNote('G4', 'trumpet');
   currentAction = '';
+  startError = '';
   currentBeat = -1;
   clarinetPosition = 'assets/images/clarinet_positions/A3.svg';
   oboePosition = 'assets/images/oboe_positions/A4.svg';
@@ -193,11 +194,12 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    this.startError = '';
     const instrument = this.instruments.fromLegacyId(this.selectedInstrument);
     const lowNote = instrument.notes[this.lowNote];
     const highNote = instrument.notes[this.highNote];
     if (!lowNote || !highNote) {
-      console.error('The selected note range is outside the instrument definition');
+      this.startError = 'Select a valid note range and try Start again.';
       return;
     }
 
@@ -217,11 +219,15 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     };
 
     this.collectedMeansObject = {};
-    await this.activitySession.start(
-      this.controller,
-      config,
-      this.createActivityContext()
-    );
+    try {
+      await this.activitySession.start(
+        this.controller,
+        config,
+        this.createActivityContext()
+      );
+    } catch {
+      this.showExerciseError();
+    }
     this.tabsService.setDisabled(this.activitySession.isActive);
     this.cdr.markForCheck();
   }
@@ -252,6 +258,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
   private handleActivitySnapshot(
     snapshot: ActivitySnapshot<PrepareListenPlayState, PrepareListenPlayResult>
   ): void {
+    if (snapshot.lifecycle === 'failed') { this.showExerciseError(); }
     if (snapshot.lifecycle === 'running') {
       this.renderRunningState(snapshot.state);
       return;
@@ -271,6 +278,12 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
       this.resetExerciseView();
       this.cdr.markForCheck();
     }
+  }
+
+  private showExerciseError(): void {
+    this.startError = 'The exercise could not continue. Check microphone permission and sound, then try Start again.';
+    this.tabsService.setDisabled(false);
+    this.cdr.markForCheck();
   }
 
   private renderRunningState(state: PrepareListenPlayState): void {

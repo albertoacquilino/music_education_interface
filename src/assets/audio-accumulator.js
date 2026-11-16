@@ -12,6 +12,11 @@ class AudioAccumulator extends AudioWorkletProcessor {
         const input = inputs[0];
         const output = outputs[0];
 
+        // Disconnected microphone nodes can receive an empty input during cleanup.
+        if (!input || !input[0] || input[0].length === 0) {
+            return true;
+        }
+
         let inputLeft = input[0];
         output[0].set(inputLeft);
         let inputRight = input[1];

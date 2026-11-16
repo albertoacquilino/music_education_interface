@@ -60,6 +60,39 @@ class TestController implements LearningActivityController<{}, string, TestResul
 }
 
 describe('ActivitySessionService', () => {
+  it('restarts a reused controller after each terminal state without replay clearing the new boundary', async () => {
+    const service = new ActivitySessionService();
+    const controller = new TestController();
+    for (const lifecycle of ['completed', 'cancelled', 'failed'] as const) {
+      await service.start(controller, {}, {} as ActivityContext);
+      const result = await controller.whenSettled();
+      if (lifecycle === 'completed') {
+        controller.snapshot$.next({ lifecycle, sessionId: 'old', result });
+      } else if (lifecycle === 'failed') {
+        controller.snapshot$.next({ lifecycle, sessionId: 'old', result,
+          failure: { code: 'resource-failed', message: 'fixture', recoverable: true } });
+      } else {
+        await service.cancel('learner-stop');
+      }
+      expect(service.isActive).toBeFalse();
+      await service.start(controller, {}, {} as ActivityContext);
+      expect(service.isActive).toBeTrue();
+      await service.cancel('learner-stop');
+    }
+  });
+
+  it('releases a thrown initialization failure so Start can retry', async () => {
+    const service = new ActivitySessionService();
+    const controller = new TestController();
+    const start = spyOn(controller, 'start').and.rejectWith(new Error('fixture'));
+    await expectAsync(service.start(controller, {}, {} as ActivityContext)).toBeRejected();
+    expect(service.isActive).toBeFalse();
+    start.and.callThrough();
+    await service.start(controller, {}, {} as ActivityContext);
+    expect(service.isActive).toBeTrue();
+    await service.cancel('learner-stop');
+  });
+
   it('owns exactly one controller boundary and cancels a superseded session', async () => {
     const service = new ActivitySessionService();
     const first = new TestController();

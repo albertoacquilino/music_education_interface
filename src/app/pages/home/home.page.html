@@ -9,6 +9,7 @@
 <div class="ion-page" id="main-content">
   <ion-content [fullscreen]="true" [scrollY]="false">
     <div id="container" class="app-viewport">
+      <p *ngIf="startError" role="alert">{{ startError }}</p>
       <div class="wrapper" id="wrapper" [class.is-playing]="isPlaying()" [class.is-idle]="!isPlaying()" [class.is-flute]="selectedInstrument === 'flute'">
 
         <!-- IDLE STATE: setup screen (unchanged) -->

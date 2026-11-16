@@ -180,6 +180,17 @@ describe('HomePage activity host', () => {
     expect(session.start.calls.mostRecent().args[1].tempoBpm).toBe(120);
   });
 
+  it('shows initialization failures and allows the next Start to retry', async () => {
+    session.start.and.rejectWith(new Error('fixture initialization failure'));
+    await page.startStop();
+    expect(page.startError).toContain('try Start again');
+    expect(tabs.setDisabled).toHaveBeenCalledWith(false);
+    session.start.and.callFake(async () => { session.isActive = true; });
+    await page.startStop();
+    expect(page.startError).toBe('');
+    expect(session.start).toHaveBeenCalledTimes(2);
+  });
+
   it('starts by composing a typed controller configuration rather than orchestrating resources', async () => {
     page.selectedInstrument = 'clarinet';
     (page as any).applyExerciseConfiguration();

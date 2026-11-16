@@ -1,3 +1,4 @@
+import { ActivitySessionService } from '../../core/activity/activity-session.service';
 import { BehaviorSubject } from 'rxjs';
 import { DYNAMICS_LEVELS } from '../../core/music/dynamics-profiles';
 import {
@@ -139,6 +140,35 @@ describe('PrepareListenPlayController', () => {
       referenceA4Hz: 440
     };
   });
+
+  for (const ending of ['completed', 'cancelled', 'superseded']) {
+    it('restarts trumpet → flute → clarinet → oboe → trumpet after ' + ending, async () => {
+      const service = new ActivitySessionService();
+      for (const id of ['trumpet-bb', 'flute-c', 'clarinet-bb', 'oboe-c', 'trumpet-bb'] as const) {
+        const instrument = context.instruments.get(id);
+        const note = instrument.notes[13];
+        await service.start(controller, { ...config, instrumentId: id,
+          lowNoteId: note.id, highNoteId: note.id, cycles: 1 }, context);
+        expect(service.isActive).toBeTrue();
+        expect(audio.preloadInstrument).toHaveBeenCalledWith(instrument, jasmine.any(Object));
+        clock.tick(1);
+        const snapshot = controller.snapshot$.value;
+        expect(snapshot.lifecycle).toBe('running');
+        if (snapshot.lifecycle === 'running') { expect(snapshot.state.target.instrumentId).toBe(id); }
+        if (ending === 'completed') {
+          clock.tick(11);
+          await controller.whenSettled();
+          expect(service.isActive).toBeFalse();
+        } else if (ending === 'cancelled') {
+          await service.cancel('learner-stop');
+          expect(service.isActive).toBeFalse();
+        }
+      }
+      await service.cancel('learner-stop');
+      expect(audio.stopAll).toHaveBeenCalled();
+      expect(pitchRelease).toHaveBeenCalled();
+    });
+  }
 
   it('emits exactly 12 complete prepare/listen/play cycles and one completion', async () => {
     const lifecycles: string[] = [];

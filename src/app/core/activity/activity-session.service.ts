@@ -37,8 +37,13 @@ export class ActivitySessionService {
     }
 
     this.activeController = controller as unknown as AnyController;
-    this.activeAbortController = new AbortController();
+    const abortController = new AbortController();
+    this.activeAbortController = abortController;
+    let subscribing = true;
     this.snapshotSubscription = controller.snapshot$.subscribe(snapshot => {
+      // BehaviorSubject replays the previous session's terminal snapshot on
+      // subscription. Only snapshots emitted by this start own the new boundary.
+      if (subscribing) { return; }
       this.snapshot$.next(snapshot as ActivitySnapshot<unknown, ActivityResultBase>);
       const active = snapshot.lifecycle === 'starting' || snapshot.lifecycle === 'running';
       this.active$.next(active);
@@ -48,11 +53,16 @@ export class ActivitySessionService {
       }
     });
 
-    await controller.start(
-      config,
-      context,
-      this.activeAbortController.signal
-    );
+    subscribing = false;
+    try {
+      await controller.start(config, context, abortController.signal);
+    } catch (error) {
+      if (this.activeAbortController === abortController) {
+        abortController.abort();
+        this.releaseSessionBoundary();
+      }
+      throw error;
+    }
   }
 
   async cancel(reason: ActivityCancelReason): Promise<ActivityResultBase | null> {
