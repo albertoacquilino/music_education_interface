@@ -23,6 +23,7 @@ export type FingeringRepresentation =
 
 export interface ReferenceAudioAsset {
   readonly path: `assets/sounds/${string}.m4a`;
+  /** Legacy nominal declaration only; playback uses the approved reference-calibration mapping. */
   readonly recordedReferenceA4Hz: 440;
   readonly recordedSoundingFrequencyHz: number;
   readonly validationStatus: 'declared-unmeasured';

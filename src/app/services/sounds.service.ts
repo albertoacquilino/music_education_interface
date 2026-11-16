@@ -21,6 +21,8 @@ import {
 } from '../instruments/instrument-definition';
 import { INSTRUMENT_DEFINITIONS } from '../instruments/instrument-registry.service';
 import { ExpressiveDynamicsPlayer, calibrateReferenceDynamics } from './expressive-dynamics';
+import { calibratedPlaybackRate, calibrationIdentity } from '../core/music/reference-audio-calibration';
+import { frequencyForMidi } from '../core/music/pitch-math';
 import { SoftDynamic } from '../core/music/dynamics-profiles';
 
 export const BEAT_SOUNDS = [
@@ -34,6 +36,10 @@ function playAndFade(
     volume: number,
     playbackRate: number
 ): AudioPlayback {
+    // Howler 2.2.4 exposes this per-instance backend flag. Never infer it from the global.
+    if ((audio as unknown as { _webAudio?: boolean })._webAudio !== true) {
+        throw new Error('Calibrated reference playback requires Web Audio; HTML Audio pitch preservation is unsupported.');
+    }
     audio.volume(volume);
     const soundId = audio.play();
     audio.rate(playbackRate, soundId);
@@ -66,7 +72,7 @@ export class SoundsService implements AudioPort {
     private readonly expressive = new ExpressiveDynamicsPlayer();
     private expressiveGeneration = 0;
     private expressiveNotes = new Map<string, {
-        buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number;
+        buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number; calibrationIdentity: string;
     }>();
     private selectedInstrument: LegacyInstrumentId = 'trumpet';
     private preloadedNotes = new Map<string, Howl>();
@@ -210,7 +216,7 @@ export class SoundsService implements AudioPort {
         if (!options?.expressiveDynamics || !Howler.usingWebAudio || !Howler.ctx
             || generation !== this.expressiveGeneration) { return; }
         const notes = new Map<string, {
-            buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number;
+            buffer: AudioBuffer; gains: Record<SoftDynamic, number>; referenceA4Hz: number; calibrationIdentity: string;
         }>();
         // Bound memory/concurrency on mobile; prepare before the timer starts.
         for (const note of instrument.notes) {
@@ -222,10 +228,11 @@ export class SoundsService implements AudioPort {
                 const context = new OfflineAudioContext(2, 96000, 48000);
                 const buffer = await context.decodeAudioData(await response.arrayBuffer());
                 if (generation !== this.expressiveGeneration) { return; }
-                const rate = options.referenceA4Hz / note.referenceAudio.recordedReferenceA4Hz;
-                const hz = note.referenceAudio.recordedSoundingFrequencyHz * rate;
+                const hz = frequencyForMidi(note.soundingMidiAtA4_440, options.referenceA4Hz);
+                const rate = calibratedPlaybackRate(note.id, note.referenceAudio.path, hz);
                 const gains = await calibrateReferenceDynamics(buffer, instrument.id, hz, rate);
-                notes.set(note.id, { buffer, gains, referenceA4Hz: options.referenceA4Hz });
+                notes.set(note.id, { buffer, gains, referenceA4Hz: options.referenceA4Hz,
+                    calibrationIdentity: calibrationIdentity(note.id, note.referenceAudio.path) });
             } catch (error) {
                 console.warn('Expressive dynamics unavailable; using gain-only playback:', note.id, error);
             }
@@ -250,11 +257,16 @@ export class SoundsService implements AudioPort {
             throw new Error(`Reference audio was not preloaded for ${target.noteId}`);
         }
 
-        const playbackRate =
-            options.desiredReferenceA4Hz / target.referenceAudio.recordedReferenceA4Hz;
+        if (options.desiredReferenceA4Hz !== target.referenceA4Hz) {
+            throw new Error('Reference target and playback tuning disagree');
+        }
+        const identity = calibrationIdentity(target.noteId, target.referenceAudio.path);
+        const playbackRate = calibratedPlaybackRate(target.noteId,
+            target.referenceAudio.path, target.expectedSoundingFrequencyHz);
         const prepared = this.expressiveNotes.get(target.noteId);
         if ((options.plpDynamic === 'mf' || options.plpDynamic === 'p')
             && prepared?.referenceA4Hz === options.desiredReferenceA4Hz
+            && prepared.calibrationIdentity === identity
             && Howler.usingWebAudio && Howler.ctx && Howler.masterGain) {
             return this.expressive.play(Howler.ctx, Howler.masterGain, prepared.buffer,
                 target.instrumentId, target.expectedSoundingFrequencyHz, options.plpDynamic,

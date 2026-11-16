@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd",
+  "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+  "exported_at": "2026-11-16T04:11:55.702Z",
+  "decisions": [
+    {
+      "note_id": "trumpet-bb:F4",
+      "asset_path": "assets/sounds/trumpet_note_sounds/F4.m4a",
+      "source_sha256": "0a5deedc857dde53068207eca0c3c7a1f0b767340e9beb8a573501744204a0bc",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 311.9848330892793,
+      "sounding_note": "Eb4",
+      "target_hz": 311.1269837220809,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "trumpet-bb:B5f",
+      "asset_path": "assets/sounds/trumpet_note_sounds/Bf5.m4a",
+      "source_sha256": "66c63062a639997afd09df1df3d35924f76b110342fef63eeeeb4e4f18179444",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 828.6607204875173,
+      "sounding_note": "Ab5",
+      "target_hz": 830.6093951598903,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:F3",
+      "asset_path": "assets/sounds/clarinet_note_sounds/F3.m4a",
+      "source_sha256": "752833990d1fc43fcb1f7c8c9fff3c446d8d57c989f2d3ae6bf8ecc515ae3465",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 154.7338014876851,
+      "sounding_note": "Eb3",
+      "target_hz": 155.56349186104046,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:G3s",
+      "asset_path": "assets/sounds/clarinet_note_sounds/Gs3.m4a",
+      "source_sha256": "e9ced81463c2410afd66eb694b1988b8466d6701dc521bad3a523b37df39f7fa",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 186.23714640533544,
+      "sounding_note": "F#3",
+      "target_hz": 184.9972113558172,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:B3f",
+      "asset_path": "assets/sounds/clarinet_note_sounds/Bf3.m4a",
+      "source_sha256": "c82e7c52a21c842dbaed4627293026fd8a5b448015117a65c006c360571fe89a",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 209.3294804451478,
+      "sounding_note": "Ab3",
+      "target_hz": 207.65234878997256,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:B3",
+      "asset_path": "assets/sounds/clarinet_note_sounds/B3.m4a",
+      "source_sha256": "b7a658947835b135d561f6ab48fdbccdc3dc0781c14c97afc99b3cbc7610dace",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 221.71995340666447,
+      "sounding_note": "A3",
+      "target_hz": 220,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:C4",
+      "asset_path": "assets/sounds/clarinet_note_sounds/C4.m4a",
+      "source_sha256": "d1ce92f17d55b7d91f2b98026eb946431c620790780a1114f639021bdf7090f1",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 234.48958753376422,
+      "sounding_note": "Bb3",
+      "target_hz": 233.08188075904496,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:C4s",
+      "asset_path": "assets/sounds/clarinet_note_sounds/Cs4.m4a",
+      "source_sha256": "8a2344943dd7670c6bee0890bb70924ab5023ca7d7f47b528f1bf57d0ff75725",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 248.06479482677423,
+      "sounding_note": "B3",
+      "target_hz": 246.94165062806206,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:D4",
+      "asset_path": "assets/sounds/clarinet_note_sounds/D4.m4a",
+      "source_sha256": "521af36ff1550b225771edb9b4f8021afd9af537669ec97ec1599b3026473848",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 262.8157559928527,
+      "sounding_note": "C4",
+      "target_hz": 261.6255653005986,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:C6s",
+      "asset_path": "assets/sounds/clarinet_note_sounds/Cs6.m4a",
+      "source_sha256": "a5bca05b91d0cd8b36824a7f2d8d9e83d3d3f602daed6a58ce5426dd7b58c0b2",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 989.9905007069634,
+      "sounding_note": "B5",
+      "target_hz": 987.7666025122483,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:E6",
+      "asset_path": "assets/sounds/clarinet_note_sounds/E6.m4a",
+      "source_sha256": "f135f57f57dc46eeefbc5b0c6324ed2a82289e267f2ef5055ab01ad979f53322",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 1181.8652255524078,
+      "sounding_note": "D6",
+      "target_hz": 1174.6590716696303,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "clarinet-bb:A6",
+      "asset_path": "assets/sounds/clarinet_note_sounds/A6.m4a",
+      "source_sha256": "e4ec8b210856ab28e2cf27fa56c443d9476d0d0dbd3a959871a258f66dcc507a",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 1573.001436047237,
+      "sounding_note": "G6",
+      "target_hz": 1567.981743926997,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    },
+    {
+      "note_id": "flute-c:C5s",
+      "asset_path": "assets/sounds/flute_note_sounds/Cs5.m4a",
+      "source_sha256": "a4a176f6c438c47ca7fa743d9b8e1e0f7fb67478c4c729bb293b3c4f71357903",
+      "decision": "approve_recommended",
+      "recommended_frequency_hz": 557.8479150995307,
+      "sounding_note": "C#5",
+      "target_hz": 554.3652619537442,
+      "manifest_sha256": "c844075b460c868cedece7b74c93bef68c985161925cdaa2a12bd65d90a419e4",
+      "source_commit": "75f8e82a05347f57c5b65cd518da3362e9090efd"
+    }
+  ]
+}

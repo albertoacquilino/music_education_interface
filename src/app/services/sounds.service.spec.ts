@@ -1,6 +1,7 @@
 import { Howl, Howler } from 'howler';
 import { InstrumentRegistryService } from '../instruments/instrument-registry.service';
 import { SoundsService } from './sounds.service';
+import { calibratedPlaybackRate } from '../core/music/reference-audio-calibration';
 import { DYNAMICS_LEVELS } from '../core/music/dynamics-profiles';
 
 describe('SoundsService explicit audio port', () => {
@@ -27,6 +28,7 @@ describe('SoundsService explicit audio port', () => {
     expect(prepared.gains.p).toBeGreaterThan(DYNAMICS_LEVELS.p);
     const target = registry.resolveTarget(instrument.id, note.id, 450);
     const audio = jasmine.createSpyObj('Howl', ['volume', 'play', 'rate', 'fade', 'stop']);
+    (audio as any)._webAudio = true;
     audio.play.and.returnValue(7);
     (service as any).preloadedNotes.set(note.id, audio);
     const processed = spyOn((service as any).expressive, 'play').and.returnValue({ stop() {} });
@@ -36,7 +38,7 @@ describe('SoundsService explicit audio port', () => {
     expect(processed).not.toHaveBeenCalled();
     service.playReference(target, { ...options, plpDynamic: 'mf' });
     expect(processed).toHaveBeenCalledOnceWith(Howler.ctx, Howler.masterGain, prepared.buffer,
-      instrument.id, target.expectedSoundingFrequencyHz, 'mf', prepared.gains.mf, 450 / 440, 3000);
+      instrument.id, target.expectedSoundingFrequencyHz, 'mf', prepared.gains.mf, calibratedPlaybackRate(target.noteId, target.referenceAudio.path, target.expectedSoundingFrequencyHz), 3000);
     const metronome = spyOn(service, 'playMetronome');
     service.stopAll();
     expect(metronome).not.toHaveBeenCalled();
@@ -62,6 +64,48 @@ describe('SoundsService explicit audio port', () => {
     expect((service as any).expressiveNotes.size).toBe(0);
   });
 
+  it('invalidates stale prepared calibration and fails closed on per-Howl HTML fallback', () => {
+    const service = new SoundsService(), registry = new InstrumentRegistryService();
+    const note = registry.get('flute-c').notes[0], target = registry.resolveTarget('flute-c', note.id, 442);
+    const audio = jasmine.createSpyObj('audio', ['play', 'rate', 'volume', 'fade', 'stop']);
+    audio._webAudio = true; audio.play.and.returnValue(7);
+    (service as any).preloadedNotes.set(note.id, audio);
+    (service as any).expressiveNotes.set(note.id, { referenceA4Hz: 442, calibrationIdentity: 'stale', gains: { p: .25 } });
+    const processed = spyOn((service as any).expressive, 'play');
+    const options = { durationMs: 1000, gain: .25, desiredReferenceA4Hz: 442, plpDynamic: 'p' as const };
+    jasmine.clock().install();
+    try {
+      service.playReference(target, options).stop();
+      expect(processed).not.toHaveBeenCalled();
+      expect(audio.rate).toHaveBeenCalledWith(calibratedPlaybackRate(note.id, note.referenceAudio.path, target.expectedSoundingFrequencyHz), 7);
+      audio._webAudio = false; audio.play.calls.reset();
+      expect(() => service.playReference(target, options)).toThrowError(/requires Web Audio/);
+      expect(audio.play).not.toHaveBeenCalled();
+      expect(() => service.playReference(target, { ...options, desiredReferenceA4Hz: 440 })).toThrowError(/disagree/);
+    } finally { jasmine.clock().uninstall(); }
+  });
+
+  for (const durationMs of [1000, 1333, 2000, 4000, 6000]) {
+    it('preserves scheduled fades, stop and cancellation at ' + durationMs + ' ms', () => {
+      const service = new SoundsService(), registry = new InstrumentRegistryService();
+      const target = registry.resolveTarget('oboe-c', registry.get('oboe-c').notes[0].id, 430);
+      const audio = jasmine.createSpyObj('audio', ['play', 'rate', 'volume', 'fade', 'stop']);
+      audio._webAudio = true; audio.play.and.returnValue(1);
+      (service as any).preloadedNotes.set(target.noteId, audio);
+      jasmine.clock().install();
+      try {
+        const options = { durationMs, gain: 1, desiredReferenceA4Hz: 430 };
+        service.playReference(target, options);
+        jasmine.clock().tick(durationMs - Math.max(durationMs / 10, 100));
+        expect(audio.fade).toHaveBeenCalledWith(1, 0, Math.max(durationMs / 10, 100), 1);
+        expect(audio.stop).not.toHaveBeenCalled();
+        jasmine.clock().tick(Math.max(durationMs / 10, 100)); expect(audio.stop).toHaveBeenCalledTimes(1);
+        service.playReference(target, options).stop(); jasmine.clock().tick(durationMs);
+        expect(audio.stop).toHaveBeenCalledTimes(2);
+      } finally { jasmine.clock().uninstall(); }
+    });
+  }
+
   it('keeps gain-only playback available after a soft-reference decode failure', async () => {
     const service = new SoundsService(), registry = new InstrumentRegistryService();
     const instrument = registry.get('flute-c'), note = instrument.notes[0];
@@ -71,6 +115,7 @@ describe('SoundsService explicit audio port', () => {
       { expressiveDynamics: true, referenceA4Hz: 440 });
     expect(warning).toHaveBeenCalled();
     const audio = jasmine.createSpyObj('Howl', ['volume', 'play', 'rate', 'fade', 'stop']);
+    (audio as any)._webAudio = true;
     audio.play.and.returnValue(1);
     (service as any).preloadedNotes.set(note.id, audio);
     service.playReference(registry.resolveTarget(instrument.id, note.id, 440),
@@ -92,6 +137,7 @@ describe('SoundsService explicit audio port', () => {
       'Howl',
       ['play', 'rate', 'volume', 'fade', 'stop']
     );
+    (audio as any)._webAudio = true;
     audio.play.and.returnValue(7);
     (service as any).preloadedNotes = new Map([[target.noteId, audio]]);
 
@@ -101,7 +147,7 @@ describe('SoundsService explicit audio port', () => {
       desiredReferenceA4Hz: 450
     });
 
-    expect(audio.rate).toHaveBeenCalledOnceWith(450 / 440, 7);
+    expect(audio.rate).toHaveBeenCalledOnceWith(calibratedPlaybackRate(target.noteId, target.referenceAudio.path, target.expectedSoundingFrequencyHz), 7);
   });
   }
 });

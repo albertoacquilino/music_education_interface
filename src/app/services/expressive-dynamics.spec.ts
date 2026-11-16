@@ -1,3 +1,5 @@
+import { calibratedPlaybackRate } from '../core/music/reference-audio-calibration';
+import { frequencyForMidi } from '../core/music/pitch-math';
 import { ExpressiveDynamicsPlayer, calibrateReferenceDynamics } from './expressive-dynamics';
 import { calibrationRms, compensatedDynamicsGain, dynamicsShelf, DYNAMICS_LEVELS } from '../core/music/dynamics-profiles';
 import { InstrumentRegistryService } from '../instruments/instrument-registry.service';
@@ -34,7 +36,8 @@ describe('production Profile C', () => {
         const decoder = new OfflineAudioContext(2, 96000, 48000);
         const buffer = await decoder.decodeAudioData(await response.arrayBuffer());
         for (const reference of index === instrument.notes.length - 1 ? [430, 440, 450] : [440]) {
-          const rate = reference / 440, hz = note.referenceAudio.recordedSoundingFrequencyHz * rate;
+          const hz = frequencyForMidi(note.soundingMidiAtA4_440, reference);
+          const rate = calibratedPlaybackRate(note.id, note.referenceAudio.path, hz);
           const gains = await calibrateReferenceDynamics(buffer, id, hz, rate);
           for (const [i, dynamic] of (['mf', 'p'] as const).entries()) {
             // Independently reproduce the already-tested comparison curve/envelope.
@@ -72,6 +75,19 @@ describe('production Profile C', () => {
   it('rejects silent calibration rather than creating NaN or amplification', () => {
     expect(() => compensatedDynamicsGain(0, 0, 'p')).toThrow();
     expect(() => compensatedDynamicsGain(1, .01, 'mf')).toThrow();
+  });
+
+  it('fades and cleans up at the rate-adjusted natural end even for long requests', async () => {
+    for (const durationMs of [1000, 1333, 6000]) {
+      const context = new OfflineAudioContext(1, 48000, 48000);
+      const buffer = context.createBuffer(1, 24000, 48000);
+      for (let i = 0; i < buffer.length; i++) { buffer.getChannelData(0)[i] = .2 * Math.sin(2 * Math.PI * 440 * i / 48000); }
+      const player = new ExpressiveDynamicsPlayer(), rate = 1.1;
+      player.play(context, context.destination, buffer, 'flute-c', 484, 'p', .25, rate, durationMs);
+      const output = await context.startRendering();
+      expect(output.getChannelData(0).slice(Math.ceil(24000 / rate) + 2).every(x => x === 0)).toBeTrue();
+      expect(player.activeVoiceCount).toBe(0);
+    }
   });
 
   it('preserves synthetic pitch and release timing with independent overlapping voices', async () => {
