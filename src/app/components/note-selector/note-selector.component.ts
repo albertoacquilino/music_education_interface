@@ -25,7 +25,7 @@ import { noteAssetName } from '../../instruments/note-asset-name';
   template: `
       <div class="simulate-input">
         <div class="title-section-wrapper">{{this.label}}</div>
-        <div [id]="_id" expand="block" class="note-image">
+        <div [id]="_id" expand="block" class="note-image" (click)="resetDraftNote()">
           <img id="note-image-id" [src]="getNoteImg(note)">
         </div>
         <ion-modal [trigger]="_id"
@@ -33,6 +33,7 @@ import { noteAssetName } from '../../instruments/note-asset-name';
             [canDismiss]="canDismiss"
             cssClass="note-modal"
             (willPresent)="resetDraftNote()"
+            (willDismiss)="commitSelection($event.detail.role)"
             [handle]="false"
             >
             <ng-template>
@@ -204,6 +205,7 @@ export class NoteSelectorComponent implements OnInit {
   private _selectedInstrument: string = 'trumpet'; // Default instrument
   _id = `note-selector-${Math.round(Math.random() * 100)}`;
   draftNote: number = 0;
+  private selectionCommitted = false;
   
   /**
    * The label for the note selector.
@@ -286,6 +288,7 @@ export class NoteSelectorComponent implements OnInit {
 
   resetDraftNote() {
     this.draftNote = this.note;
+    this.selectionCommitted = false;
   }
 
   async cancelSelection() {
@@ -294,10 +297,16 @@ export class NoteSelectorComponent implements OnInit {
   }
 
   async confirmSelection() {
-    if (this.draftNote !== this.note) {
-      this.change.emit(this.draftNote);
-    }
     await this.noteModal?.dismiss(undefined, 'confirm');
+  }
+
+  commitSelection(role?: string) {
+    if ((role === 'confirm' || role === 'backdrop') && !this.selectionCommitted) {
+      this.selectionCommitted = true;
+      if (this.draftNote !== this.note) {
+        this.change.emit(this.draftNote);
+      }
+    }
   }
 
   /**

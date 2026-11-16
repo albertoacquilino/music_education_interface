@@ -217,12 +217,22 @@ export class TempoSelectorComponent implements OnInit {
         },
         {
           text: 'Confirm',
-          handler: (value) => {
-            this.tempo = value['tempo'].value; // Update the tempo with the selected value
-            this.change.emit(this.tempo); // Emit the change event with the new tempo
-          }
+          role: 'confirm'
         },
       ],
+    });
+
+    // Backdrop taps and Escape both use Ionic's 'backdrop' role. Read the
+    // current column before dismissal removes it; explicit Cancel stays separate.
+    void picker.onWillDismiss().then(async ({ role }) => {
+      if (role === 'confirm' || role === 'backdrop') {
+        const column = await picker.getColumn('tempo');
+        const value = column?.options[column.selectedIndex ?? -1]?.value;
+        if (value !== undefined && value !== this.tempo) {
+          this.tempo = value;
+          this.change.emit(this.tempo);
+        }
+      }
     });
 
     await picker.present(); // Present the picker to the user

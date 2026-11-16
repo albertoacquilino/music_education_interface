@@ -1,3 +1,7 @@
+import { NoteSelectorComponent } from '../../components/note-selector/note-selector.component';
+import { TempoSelectorComponent } from '../../components/tempo-selector/tempo-selector.component';
+import { PickerController } from '@ionic/angular';
+import { MINTEMPO, MAXTEMPO } from '../../constants';
 import { ChangeDetectorRef, EventEmitter } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import {
@@ -109,6 +113,71 @@ describe('HomePage activity host', () => {
   afterEach(() => {
     page.ngOnDestroy();
     jasmine.clock().uninstall();
+  });
+
+  for (const legacyId of ['trumpet', 'clarinet', 'oboe', 'flute'] as const) {
+    it('uses backdrop selections in the next exercise for ' + legacyId, async () => {
+      page.selectedInstrument = legacyId;
+      (page as any).applyExerciseConfiguration();
+      page.useFlatsAndSharps = true;
+      page.lowNote = 0;
+      page.highNote = 2;
+      const low = new NoteSelectorComponent();
+      low.note = page.lowNote;
+      low.resetDraftNote();
+      low.change.subscribe(value => page.changeLowNote(value));
+      low.draftNote = 4;
+      low.commitSelection('backdrop');
+      expect(page.lowNote).toBe(4);
+      expect(page.highNote).toBe(4); // Existing crossed-range correction.
+      const high = new NoteSelectorComponent();
+      high.note = page.highNote;
+      high.resetDraftNote();
+      high.change.subscribe(value => page.changeHighNote(value));
+      high.draftNote = 6;
+      high.commitSelection('backdrop');
+
+      let dismiss!: (value: { role: string }) => void;
+      const picker = {
+        present: async () => {},
+        onWillDismiss: () => new Promise(resolve => { dismiss = resolve; }),
+        getColumn: async () => ({ selectedIndex: 0, options: [{ value: 120 }] })
+      };
+      const tempo = new TempoSelectorComponent({ create: async () => picker } as unknown as PickerController);
+      tempo.tempo = 80;
+      tempo.change.subscribe(value => page.changeTempo(value));
+      await tempo.openPicker();
+      dismiss({ role: 'backdrop' });
+      await Promise.resolve();
+      await Promise.resolve();
+      await page.startStop();
+      const instrument = instruments.fromLegacyId(legacyId);
+      expect(session.start.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({
+        instrumentId: instrument.id, tempoBpm: 120, lowNoteIndex: 4, highNoteIndex: 6,
+        lowNoteId: instrument.notes[4].id, highNoteId: instrument.notes[6].id
+      }));
+    });
+  }
+
+  it('retains note bounds, note ordering and tempo validation', async () => {
+    page.useFlatsAndSharps = true;
+    page.changeLowNote(999);
+    expect(page.lowNote).toBe(page.NOTES.length - 1);
+    expect(page.highNote).toBe(page.lowNote);
+    page.changeHighNote(-5);
+    expect(page.lowNote).toBe(0);
+    expect(page.highNote).toBe(0);
+    page.useFlatsAndSharps = false;
+    page.changeHighNote(0); // Trumpet's first chromatic note is F#3.
+    expect(page.lowNote).toBe(0);
+    expect(page.highNote).toBe(1); // Existing natural-note correction to G3.
+    page.changeLowNote(0);
+    expect(page.lowNote).toBe(1);
+    page.changeTempo(120);
+    page.changeTempo(MINTEMPO - 1);
+    page.changeTempo(MAXTEMPO + 1);
+    await page.startStop();
+    expect(session.start.calls.mostRecent().args[1].tempoBpm).toBe(120);
   });
 
   it('starts by composing a typed controller configuration rather than orchestrating resources', async () => {
