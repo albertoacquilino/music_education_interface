@@ -47,7 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
-    private func configureAudioSession() {
+    fileprivate func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
 
         do {
@@ -60,5 +60,47 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         } catch {
             print("Failed to configure AVAudioSession: \(error.localizedDescription)")
         }
+    }
+}
+
+// Keep the existing single-window Capacitor storyboard while adopting the scene
+// lifecycle required by iOS 27 for apps built with the iOS 27 SDK.
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+    var window: UIWindow?
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
+               options connectionOptions: UIScene.ConnectionOptions) {
+        guard scene is UIWindowScene else { return }
+        (UIApplication.shared.delegate as? AppDelegate)?.window = window
+        self.scene(scene, openURLContexts: connectionOptions.urlContexts)
+        for activity in connectionOptions.userActivities {
+            self.scene(scene, continue: activity)
+        }
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        (UIApplication.shared.delegate as? AppDelegate)?.configureAudioSession()
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let delegate = UIApplication.shared.delegate as? AppDelegate else { return }
+        for context in URLContexts {
+            var options: [UIApplication.OpenURLOptionsKey: Any] = [
+                .openInPlace: context.options.openInPlace
+            ]
+            if let source = context.options.sourceApplication {
+                options[.sourceApplication] = source
+            }
+            if let annotation = context.options.annotation {
+                options[.annotation] = annotation
+            }
+            _ = delegate.application(UIApplication.shared, open: context.url, options: options)
+        }
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        guard let delegate = UIApplication.shared.delegate as? AppDelegate else { return }
+        _ = delegate.application(UIApplication.shared, continue: userActivity,
+                                 restorationHandler: { _ in })
     }
 }
