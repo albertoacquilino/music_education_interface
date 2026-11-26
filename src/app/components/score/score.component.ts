@@ -11,8 +11,8 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
-  HostListener,
   Input,
+  NgZone,
   OnDestroy,
   ViewChild
 } from '@angular/core';
@@ -50,7 +50,8 @@ import { RenderContext, Renderer } from 'vexflow';
     }
 
     .score-surface {
-      flex: 1 1 auto;
+      position: relative;
+      flex: 1 1 0;
       min-height: 0;
       width: 100%;
       background-color: white;
@@ -95,30 +96,16 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
   private _renderer!: Renderer;
   private _context!: RenderContext;
   private renderSubscription?: Subscription;
-  private resizeTimer?: number;
+  private resizeObserver?: ResizeObserver;
   displayNoteName = '';
-  /**
-   * Constructor for the ScoreViewComponent.
-   * 
-   * @param hostElement - The ElementRef of the host element, used to determine the size of the component.
-   */
-  constructor(private hostElement: ElementRef) { }
+  constructor(private zone: NgZone) {}
 
-  @HostListener('window:resize')
-  /**
-   * Sets the size of the score component based on the dimensions of the host element.
-   * This method is triggered whenever the window is resized, ensuring the score
-   * is displayed correctly in the available space.
-   */
-  setSize() {
-    const hostRect = this.hostElement.nativeElement.getBoundingClientRect();
-    const noteLabelReserve = 38;
-    const size = {
-      width: Math.max(hostRect.width, 220),
-      height: Math.max(hostRect.height - noteLabelReserve, 96)
-    };
-
-    this.size$.next(size);
+  private setSize(): void {
+    const { clientWidth: width, clientHeight: height } = this.scoreSurface.nativeElement;
+    const previous = this.size$.value;
+    if (previous.width !== width || previous.height !== height) {
+      this.zone.run(() => this.size$.next({ width, height }));
+    }
   }
 
   /**
@@ -140,12 +127,18 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
    * Lifecycle hook that is called after the view has been initialized.
    * 
    * This method initializes the VexFlow renderer and context, subscribes to changes
-   * in size and score, and sets the size of the component after a short delay.
+   * in size and score, and observes layout changes in the notation panel.
    */
   ngAfterViewInit(): void {
     const div = this.scoreSurface.nativeElement;
     this._renderer = new Flow.Renderer(div as HTMLDivElement, Flow.Renderer.Backends.SVG);
     this._context = this._renderer.getContext();
+    const svg = div.querySelector('svg');
+    if (svg) {
+      // Keep the drawing out of flex sizing so it cannot resize its own viewport.
+      svg.style.position = 'absolute';
+      svg.style.inset = '0';
+    }
 
     this.renderSubscription = combineLatest([this.size$, this.score$]).pipe(
       filter(([size, score]) =>
@@ -156,16 +149,13 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
       this.updateScore(score as Score)
     });
 
-    this.resizeTimer = window.setTimeout(() => {
-      this.setSize();
-    }, 1000);
+    this.resizeObserver = new ResizeObserver(() => this.setSize());
+    this.resizeObserver.observe(div);
   }
 
   ngOnDestroy(): void {
     this.renderSubscription?.unsubscribe();
-    if (this.resizeTimer !== undefined) {
-      window.clearTimeout(this.resizeTimer);
-    }
+    this.resizeObserver?.disconnect();
   }
 
   /**
@@ -183,7 +173,9 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this._context.clear();
-    const measureWidth = (this.size$.value.width - 20) / score.measures.length;
+    const { width, height } = this.size$.value;
+    const drawingWidth = Math.max(width, 220);
+    const measureWidth = (drawingWidth - 20) / score.measures.length;
     this.displayNoteName = this.getDisplayNoteName(score);
 
     let staveMeasure = null;
@@ -210,7 +202,7 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
         if (dynamicPosition === index + 1) {
           staveMeasure.setText(score.dynamic,
             Flow.Modifier.Position.BELOW, {
-            shift_y: 30,
+            shift_y: 10,
             shift_x: (-measureWidth / 2) + 10,
           });
         }
@@ -225,15 +217,28 @@ export class ScoreViewComponent implements AfterViewInit, OnDestroy {
     }
 
     const svg = this.scoreSurface.nativeElement.querySelector('svg');
-    if (svg) {
-      svg.querySelectorAll('text').forEach((textEl: SVGTextElement) => {
-      const val = textEl.textContent?.trim();
-      if (val === 'mf' || val === 'f' || val === 'p') {
+    if (!svg) {
+      return;
+    }
+
+    svg.querySelectorAll('text').forEach(textEl => {
+      const value = textEl.textContent?.trim();
+      if (value === 'mf' || value === 'f' || value === 'p') {
         textEl.setAttribute('font-style', 'italic');
         textEl.setAttribute('font-weight', 'bold');
       }
     });
-    }
+
+    // Fit the full drawing, including ledger lines and italic descenders,
+    // into the space left after the separate note name has been laid out.
+    const bounds = svg.getBBox();
+    const padding = 4;
+    const left = Math.min(0, Math.floor(bounds.x - padding));
+    const top = Math.min(0, Math.floor(bounds.y - padding));
+    const right = Math.max(drawingWidth, Math.ceil(bounds.x + bounds.width + padding));
+    const bottom = Math.max(height, Math.ceil(bounds.y + bounds.height + padding));
+    svg.setAttribute('viewBox', `${left} ${top} ${right - left} ${bottom - top}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
   }
 
   private getDisplayNoteName(score: Score): string {
