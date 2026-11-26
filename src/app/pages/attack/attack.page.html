@@ -1,0 +1,129 @@
+<div class="ion-page" id="attack-content">
+  <ion-content [fullscreen]="true">
+    <main class="attack-page">
+      <header class="activity-header surface-panel">
+        <div>
+          <p class="eyebrow">Live analysis</p>
+          <h1>Attack</h1>
+          <p>{{ selectedInstrumentName }} · written notes</p>
+        </div>
+        <div class="activity-progress" *ngIf="attacks.length">
+          {{ measuredCount }} {{ measuredCount === 1 ? 'attack' : 'attacks' }}
+          <span>{{ attacks.length }} {{ attacks.length === 1 ? 'note' : 'notes' }} heard</span>
+        </div>
+      </header>
+
+      <section class="start-panel surface-panel" *ngIf="state === 'idle' && !attacks.length">
+        <div>
+          <h2>Listen to your attacks</h2>
+          <p>
+            Play single notes or a phrase. For every note, the app measures
+            how long the tone takes to emerge from the noise of the attack
+            (breath, tongue) and shows it in milliseconds.
+          </p>
+          <p class="hint">
+            Values are shown as they are, without any evaluation. Each one
+            appears a fraction of a second after the note starts.
+          </p>
+        </div>
+        <p class="terminal-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <ion-button expand="block" size="large" (click)="start()">
+          Start listening
+        </ion-button>
+      </section>
+
+      <section class="starting-panel surface-panel" *ngIf="state === 'starting'">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p>Opening microphone…</p>
+      </section>
+
+      <section class="tracking-grid" *ngIf="state === 'listening' || attacks.length">
+        <div class="readout-panel surface-panel" aria-live="polite">
+          <p class="eyebrow">Last attack</p>
+          <div class="readout">
+            <span class="readout-value">{{ formatMs(shown) }}</span>
+            <span class="readout-unit">ms</span>
+          </div>
+          <p class="readout-detail">
+            <ng-container *ngIf="shown; else noValue">
+              {{ noteName(shown.pitchHz) }} · at {{ formatTime(shown.onsetS) }}
+              <span class="pending" *ngIf="shown.status === 'updating'">· refining</span>
+            </ng-container>
+            <ng-template #noValue>No attack measured yet</ng-template>
+          </p>
+
+          <p class="status-label" *ngIf="listening">
+            <span class="dot" [class.active]="latest?.status === 'measuring' || latest?.status === 'updating'"></span>
+            {{ statusLabel() }}
+          </p>
+          <p class="status-label" *ngIf="!listening">Not listening</p>
+
+          <div class="level" *ngIf="listening">
+            <div>
+              <span>Input level</span>
+            </div>
+            <ion-progress-bar [value]="level"></ion-progress-bar>
+          </div>
+
+          <div class="recent" *ngIf="recent.length" aria-label="Recent attacks">
+            <div class="recent-header">
+              <span>Recent attacks</span>
+              <span>scale {{ scaleMs }} ms</span>
+            </div>
+            <div class="recent-bars">
+              <div
+                class="recent-bar"
+                *ngFor="let record of recent; trackBy: trackById"
+                [style.height.%]="barPercent(record)"
+                [class.pending]="record.status === 'updating'"
+                [attr.title]="formatMs(record) + ' ms'"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="list-panel surface-panel">
+          <div class="list-header">
+            <p class="eyebrow">Recorded attacks</p>
+            <span>{{ attacks.length }}</span>
+          </div>
+
+          <p class="empty" *ngIf="!attacks.length">
+            Play a note: each attack will appear here.
+          </p>
+
+          <ol class="attack-list" *ngIf="attacks.length">
+            <li
+              *ngFor="let record of attacksNewestFirst; trackBy: trackById"
+              [attr.data-status]="record.status"
+            >
+              <span class="index">{{ record.id }}</span>
+              <span class="note">{{ noteName(record.pitchHz) }}</span>
+              <span class="time">{{ formatTime(record.onsetS) }}</span>
+              <span class="bar" aria-hidden="true">
+                <span [style.width.%]="barPercent(record)"></span>
+              </span>
+              <span class="value">
+                <span class="ms" *ngIf="record.attackMs !== null">{{ formatMs(record) }}<small> ms</small></span>
+                <small class="status" *ngIf="recordStatusLabel(record)">{{ recordStatusLabel(record) }}</small>
+              </span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="activity-controls surface-panel" *ngIf="state === 'listening' || attacks.length">
+        <p class="terminal-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <ion-button fill="outline" color="medium" [disabled]="!attacks.length" (click)="clear()">
+          Clear list
+        </ion-button>
+        <ion-button *ngIf="!listening" (click)="start()" [disabled]="state === 'starting'">
+          Start listening
+        </ion-button>
+        <ion-button *ngIf="listening" color="danger" fill="outline" (click)="stop()">
+          Stop
+        </ion-button>
+      </section>
+    </main>
+  </ion-content>
+</div>

@@ -53,6 +53,10 @@ export const routes: Routes = [
         ).then(m => m.TargetIntonationPage),
       },
       {
+        path: 'attack',
+        loadComponent: () => import('./pages/attack/attack.page').then(m => m.AttackPage),
+      },
+      {
         path: '',
         redirectTo: 'exercise', // Redirects to the exercise route by default
         pathMatch: 'full',
