@@ -16,22 +16,14 @@ import {
   Output,
   ViewChild
 } from '@angular/core';
-import { createRenderer } from './renderers';
-import {
-  AttackVariant,
-  Palette,
-  StageData,
-  StageRenderer,
-  levelOf,
-  pixelColumns,
-  TimeAxis
-} from './stage-model';
+import { AttackHistoryRenderer } from './attack-history-renderer';
+import { Palette, StageData, TimeAxis, levelOf, pixelColumns } from './stage-model';
 
 /** Height of the overview strip shown in playback. */
 const OVERVIEW_H = 34;
 
 /**
- * Canvas that draws the scrolling input and the attacks, redrawn on every
+ * Canvas that draws the history of the attacks, redrawn on every
  * animation frame outside the Angular zone. In playback it adds an overview
  * of the whole recording; tapping it emits `seek` with the time, in seconds
  * from the start of the recording.
@@ -47,14 +39,13 @@ const OVERVIEW_H = 34;
   `]
 })
 export class AttackStageComponent implements AfterViewInit, OnDestroy {
-  @Input() variant: AttackVariant = 'wave';
   /** Called once per frame; null draws nothing. */
   @Input() source: () => StageData | null = () => null;
   @Output() seek = new EventEmitter<number>();
 
   @ViewChild('canvas', { static: true }) private canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  private readonly renderers = new Map<AttackVariant, StageRenderer>();
+  private readonly renderer = new AttackHistoryRenderer();
   private frameId = 0;
   private palette: Palette | null = null;
   private paletteAge = 0;
@@ -111,17 +102,12 @@ export class AttackStageComponent implements AfterViewInit, OnDestroy {
     if (!data) {
       return;
     }
-    let renderer = this.renderers.get(this.variant);
-    if (!renderer) {
-      renderer = createRenderer(this.variant);
-      this.renderers.set(this.variant, renderer);
-    }
     const mainH = data.overview ? this.height - OVERVIEW_H - 8 : this.height;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, this.width, mainH);
     ctx.clip();
-    renderer.draw({ ctx, width: this.width, height: mainH, time, data, palette: this.palette });
+    this.renderer.draw({ ctx, width: this.width, height: mainH, time, data, palette: this.palette });
     ctx.restore();
     if (data.overview) {
       this.drawOverview(ctx, data, data.overview, mainH + 8);
@@ -193,8 +179,7 @@ export class AttackStageComponent implements AfterViewInit, OnDestroy {
       text: toHex(ctx, text),
       background: toHex(ctx, pick('--ion-background-color', '#ffffff')),
       primary: toHex(ctx, pick('--ion-color-primary', '#3880ff')),
-      noise: toHex(ctx, pick('--attack-noise-color', '#9aa0aa')),
-      record: toHex(ctx, pick('--ion-color-danger', '#eb445a'))
+      noise: toHex(ctx, pick('--attack-noise-color', '#9aa0aa'))
     };
   }
 }

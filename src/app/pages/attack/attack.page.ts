@@ -9,18 +9,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { Subscription } from 'rxjs';
 import { addIcons } from 'ionicons';
-import {
-  barChartOutline,
-  close,
-  cloudyOutline,
-  micOutline,
-  musicalNotesOutline,
-  pause,
-  play,
-  pulseOutline,
-  refresh,
-  volumeHighOutline
-} from 'ionicons/icons';
+import { close, micOutline, pause, play, refresh, volumeHighOutline } from 'ionicons/icons';
 import { AttackRecord } from '../../activities/attack-clarity/attack-tracker';
 import { BackgroundCondition } from '../../activities/attack-clarity/background-monitor';
 import { midiToSpelledPitch } from '../../core/music/pitch-math';
@@ -35,20 +24,13 @@ import {
 import { RefFreqService } from '../../services/ref-freq.service';
 import { TabsService } from '../../services/tabs.service';
 import { AttackStageComponent } from './stage/attack-stage.component';
-import { AttackVariant, StageData } from './stage/stage-model';
+import { StageData } from './stage/stage-model';
 
 const ITALIAN_NAMES: Record<string, string> = {
   C: 'Do', D: 'Re', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si'
 };
-const VARIANT_KEY = 'attackVariant';
 /** Circumference of the progress ring around the record button (r = 30). */
 const RING = 2 * Math.PI * 30;
-
-interface VariantOption {
-  id: AttackVariant;
-  label: string;
-  icon: string;
-}
 
 @Component({
   selector: 'app-attack',
@@ -64,16 +46,9 @@ export class AttackPage implements OnInit, OnDestroy {
   private ticker: ReturnType<typeof setInterval> | null = null;
   private active = false;
 
-  readonly variants: readonly VariantOption[] = [
-    { id: 'wave', label: 'Wave', icon: 'pulse-outline' },
-    { id: 'fog', label: 'Fog', icon: 'cloudy-outline' },
-    { id: 'ribbon', label: 'Pitch', icon: 'musical-notes-outline' },
-    { id: 'spotlight', label: 'Spotlight', icon: 'bar-chart-outline' }
-  ];
   readonly ring = RING;
   readonly maxRecordingS = MAX_RECORDING_S;
 
-  variant: AttackVariant = 'wave';
   selectedInstrument: LegacyInstrumentId = 'trumpet';
   language = 'en';
   referenceA4Hz = 440;
@@ -95,10 +70,7 @@ export class AttackPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    addIcons({
-      barChartOutline, close, cloudyOutline, micOutline, musicalNotesOutline,
-      pause, play, pulseOutline, refresh, volumeHighOutline
-    });
+    addIcons({ close, micOutline, pause, play, refresh, volumeHighOutline });
     this.loadSettings();
     this.subscriptions.add(
       this.referenceFrequency.getRefFrequency().subscribe(value => {
@@ -172,17 +144,6 @@ export class AttackPage implements OnInit, OnDestroy {
     this.listener.resumeAudio();
   }
 
-  selectVariant(value: unknown): void {
-    if (this.variants.some(v => v.id === value)) {
-      this.variant = value as AttackVariant;
-      try {
-        localStorage.setItem(VARIANT_KEY, this.variant);
-      } catch {
-        // Storage unavailable: the choice lasts for this session only.
-      }
-    }
-  }
-
   toggleRecord(): void {
     if (this.recorder === 'recording') {
       this.listener.stopRecording();
@@ -242,10 +203,8 @@ export class AttackPage implements OnInit, OnDestroy {
         attacks: take.attacks,
         nowS: take.startS + this.listener.playbackPositionS,
         live: false,
-        recordFromS: null,
         overview: { startS: take.startS, endS: take.endS },
-        noteName: this.noteName,
-        referenceA4Hz: this.referenceA4Hz
+        noteName: this.noteName
       };
     }
     const track = this.listener.liveTrack;
@@ -257,10 +216,8 @@ export class AttackPage implements OnInit, OnDestroy {
       attacks: this.attacks,
       nowS: this.listener.nowS,
       live: true,
-      recordFromS: this.recorder === 'recording' && take ? take.startS : null,
       overview: null,
-      noteName: this.noteName,
-      referenceA4Hz: this.referenceA4Hz
+      noteName: this.noteName
     };
   };
 
@@ -322,10 +279,6 @@ export class AttackPage implements OnInit, OnDestroy {
       this.selectedInstrument = saved;
     }
     this.language = localStorage.getItem('language') ?? 'en';
-    const variant = localStorage.getItem(VARIANT_KEY);
-    if (this.variants.some(v => v.id === variant)) {
-      this.variant = variant as AttackVariant;
-    }
     this.cdr.markForCheck();
   }
 

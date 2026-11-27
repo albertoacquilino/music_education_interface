@@ -20,27 +20,10 @@
 
 /* Top bar ------------------------------------------------------------------ */
 
+/* Instrument chip, on the right above the stage. */
 .top-bar {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.variant-picker {
-  flex: 1 1 auto;
-  max-width: 560px;
-
-  ion-segment-button {
-    min-width: 0;
-    --padding-start: 10px;
-    --padding-end: 10px;
-    text-transform: none;
-    font-weight: 700;
-  }
-
-  ion-icon {
-    font-size: 1.1rem;
-  }
+  justify-content: flex-end;
 }
 
 .instrument-chip {
@@ -253,24 +236,6 @@
 }
 
 @media screen and (max-width: 767px) {
-  .top-bar {
-    flex-wrap: wrap;
-  }
-
-  .instrument-chip {
-    display: none;
-  }
-
-  .variant-picker {
-    max-width: none;
-
-    ion-segment-button {
-      --padding-start: 6px;
-      --padding-end: 6px;
-      font-size: 0.78rem;
-    }
-  }
-
   .stage {
     min-height: 220px;
   }

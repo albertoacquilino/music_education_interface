@@ -34,8 +34,8 @@ pitch jump for slurs) and costs about 1% of real time.
 | `src/assets/attack-clarity/attack_clarity_wasm.js`, `attack_clarity_wasm_bg.wasm` | wasm-bindgen package (`--target web`), copied from attack-clarity-rs |
 | `src/app/services/attack-clarity.service.ts` | `AttackClarityService`: microphone, AudioWorklet, wasm analyzer, observables |
 | `src/app/activities/attack-clarity/attack-tracker.ts` | `AttackTracker`: turns analyzer events into a list of attacks (pure, unit tested) |
-| `src/app/activities/attack-clarity/waveform-track.ts` | `WaveformTrack`: down-sampled input for the scrolling views |
-| `src/app/pages/attack/` | `AttackPage`: the tab UI; `stage/` holds the canvas and its four renderers |
+| `src/app/activities/attack-clarity/waveform-track.ts` | `WaveformTrack`: down-sampled input, drawn in the playback overview |
+| `src/app/pages/attack/` | `AttackPage`: the tab UI; `stage/` holds the canvas and the attack history renderer |
 | `src/app/pages/tabs/tabs.page.*`, `src/app/app.routes.ts` | new mode `attack`, route `/home/attack`, entries in the desktop nav, mobile tab bar and Options › Mode |
 
 ## Audio path
@@ -129,24 +129,18 @@ the background. If iOS keeps the audio context suspended for lack of a user
 gesture, a "Tap to listen" overlay resumes it.
 
 - **Stage**: a canvas (`pages/attack/stage/`) redrawn on every animation
-  frame outside the Angular zone, showing the input scrolling right to left
-  with the attacks drawn where they happen. A selector at the top switches
-  between four views (kept in `localStorage.attackVariant`):
-  - *Wave*: the waveform, blue where the harmonic part dominates and grey
-    where the noise does, with a lens over each attack that magnifies the
-    first ~150 ms (noise and harmonic envelopes, attack shaded) and its value;
-  - *Fog*: a closer view (2–4 s) of the harmonic envelope rising through the
-    noise envelope, with an arrow from the onset to where the tone clears it;
-  - *Pitch*: a pitch ribbon (height = written note, thickness = level), each
-    note starting with a bubble whose size follows the attack time;
-  - *Spotlight*: the last value in large type over the history of the last
-    N attacks at a fixed spacing (a pause does not empty it), each bar with
-    its value on top and the written note underneath. N fits the width with
-    slots of at least 40 px, between 6 and 24 (about 9 on a phone).
+  frame outside the Angular zone. It shows the last value in large type
+  over the history of the last N attacks at a fixed spacing, newest on the
+  right (a pause does not empty it), each bar with its value on top and the
+  written note underneath. N fits the width with slots of at least 40 px,
+  between 6 and 24 (about 9 on a phone). A note still being measured shows
+  as a pulsing dot, one that could not be measured as an empty circle.
+  Earlier prototypes with other views (waveform with a lens on each attack,
+  harmonic part rising through the noise, pitch ribbon) are in commit
+  `ef91a32`.
 - **Record** (up to 30 s, `MAX_RECORDING_S`) and **play back**: while
-  playing, the stage shows the recording with a centred playhead, the values
-  appearing as the playhead reaches them, and an overview strip that can be
-  tapped to seek. During playback the analyzer is fed silence, so the sound
+  playing, the bars appear as the playback reaches each attack, and an
+  overview strip of the whole recording can be tapped to seek. During playback the analyzer is fed silence, so the sound
   coming out of the speaker is not measured again. Options are disabled only
   while recording or playing.
 

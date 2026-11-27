@@ -2,18 +2,6 @@
   <ion-content [fullscreen]="true" [scrollY]="false">
     <main class="attack-page">
       <header class="top-bar">
-        <ion-segment
-          class="variant-picker"
-          [value]="variant"
-          (ionChange)="selectVariant($event.detail.value)"
-          [scrollable]="true"
-          aria-label="View"
-        >
-          <ion-segment-button *ngFor="let v of variants" [value]="v.id" layout="icon-start">
-            <ion-icon [name]="v.icon" aria-hidden="true"></ion-icon>
-            <ion-label>{{ v.label }}</ion-label>
-          </ion-segment-button>
-        </ion-segment>
         <span class="instrument-chip">{{ selectedInstrumentName }}</span>
       </header>
 
@@ -23,7 +11,6 @@
         [class.is-playing]="recorder === 'playing'"
       >
         <app-attack-stage
-          [variant]="variant"
           [source]="stageSource"
           (seek)="seek($event)"
         ></app-attack-stage>
