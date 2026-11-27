@@ -882,6 +882,12 @@ body.dark-theme {
     background: transparent;
   }
 
+  // The "Play reference tone" row of Target Intonation.
+  app-target-intonation ion-item {
+    --background: transparent;
+    --color: #ffffff;
+  }
+
   app-pitchlite .tuner-card.surface-panel {
     background: var(--app-surface, #111111) !important;
     border-color: var(--app-border, #2a2a2a);
