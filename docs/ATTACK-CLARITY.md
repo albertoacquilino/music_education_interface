@@ -134,6 +134,57 @@ panel explaining what is measured, then two panels and a controls bar.
   Options is disabled while listening. Leaving the tab stops listening and
   releases the microphone.
 
+## Loud backgrounds
+
+The note tracker of attack-clarity-rs measures the background level between
+notes and starts a note only when the input envelope (the maximum of each
+period) exceeds `2 * quiet`, with `quiet = max(abs_min, 4 * background)`:
+about 18 dB above the background. Its parameters are not exposed by the
+wasm bindings.
+
+With a loud background (tested in a car on a motorway, laptop microphone,
+voice about 6–10 dB above the noise) this threshold can no longer be
+reached and no new note starts. The condition feeds itself: while no note
+is open the tracker keeps measuring the background, so the sound being
+played raises the estimate and the threshold with it. In that session the
+estimate went from -33 to -15 dBFS and the threshold above full scale.
+Nothing crashes: audio keeps flowing and the analyzer keeps running.
+
+`BackgroundMonitor` (`src/app/activities/attack-clarity/background-monitor.ts`)
+replays the tracker's segmentation on the envelope frames and counts the
+frames that look like sound being played while no note is open: a pitch is
+detected, the level is more than 6 dB above the actual noise (the lowest
+100 ms average of the last 3 s) and at least 30% of the recent playing peak
+(so that the fading end of a note does not count). With 300 ms of such
+frames in the last 3 s, `AttackClarityService.background$` becomes
+`too-loud` and the page shows a neutral notice; it goes back to `normal`
+after 3 s without any.
+
+On the trumpet recording with low-frequency noise added (one-pole lowpass,
+RMS level as shown):
+
+| added noise | notes detected (of 27) | notice |
+|---|---|---|
+| none, -60, -55 dBFS | 27 | never |
+| -50 dBFS | 19 | while notes are being missed |
+| -45, -40, -30 dBFS | 3, 0, 0 | while playing; off in the pauses |
+| -20 dBFS | 0 | never: the noise covers the pitch too |
+
+A fixed high-pass filter before the analyzer was considered and left out:
+it would cut into the lowest notes of the app's instruments (about
+147–165 Hz sounding for clarinet and trumpet).
+
+## Diagnostics
+
+In dev builds, or with `localStorage.attackDebug = '1'` (and off with
+`'0'`), `src/app/services/attack-clarity-debug.ts` logs with the `[attack]`
+prefix every analyzer event and, once per second, the audio context and
+microphone state, message and block counts, processing time, input level,
+envelope statistics and the monitor's estimates. Errors thrown by the wasm
+module are caught and logged. The raw input (up to 5 minutes) is kept in
+memory; `__attackDebug.downloadWav()` in the console saves it as a WAV for
+offline replay.
+
 ## Updating the wasm package
 
 In attack-clarity-rs:
@@ -160,7 +211,7 @@ and the event layout in the tracker.
   10 ms offline against 24 ms in the browser on one note). The cause has not
   been checked; likely candidates are the resampling in `decodeAudioData` and
   the routing of the stream through a second AudioContext in that test setup.
-- Not yet tried with a real microphone, nor on iOS or Android.
+- Tried with a real microphone (laptop, voice, in a moving car); not yet on iOS or Android.
 
 ## Licence
 

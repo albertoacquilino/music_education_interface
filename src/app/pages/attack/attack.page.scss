@@ -158,6 +158,24 @@
   }
 }
 
+.background-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.14);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 1.2rem;
+    opacity: 0.8;
+  }
+}
+
 @keyframes pulse {
   from { opacity: 0.35; }
   to { opacity: 1; }

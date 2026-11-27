@@ -8,7 +8,10 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { Subscription } from 'rxjs';
+import { addIcons } from 'ionicons';
+import { informationCircleOutline } from 'ionicons/icons';
 import { AttackRecord } from '../../activities/attack-clarity/attack-tracker';
+import { BackgroundCondition } from '../../activities/attack-clarity/background-monitor';
 import { midiToSpelledPitch } from '../../core/music/pitch-math';
 import { LegacyInstrumentId } from '../../instruments/instrument-definition';
 import { InstrumentRegistryService } from '../../instruments/instrument-registry.service';
@@ -44,6 +47,7 @@ export class AttackPage implements OnInit, OnDestroy {
   state: AttackListenerState = 'idle';
   attacks: readonly AttackRecord[] = [];
   level = 0;
+  background: BackgroundCondition = 'normal';
   errorMessage = '';
 
   constructor(
@@ -55,6 +59,7 @@ export class AttackPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    addIcons({ informationCircleOutline });
     this.loadSettings();
     this.subscriptions.add(
       this.referenceFrequency.getRefFrequency().subscribe(value => {
@@ -68,6 +73,10 @@ export class AttackPage implements OnInit, OnDestroy {
     }));
     this.subscriptions.add(this.listener.attacks$.subscribe(attacks => {
       this.attacks = attacks;
+      this.cdr.markForCheck();
+    }));
+    this.subscriptions.add(this.listener.background$.subscribe(background => {
+      this.background = background;
       this.cdr.markForCheck();
     }));
     this.subscriptions.add(this.listener.level$.subscribe(level => {
@@ -163,6 +172,14 @@ export class AttackPage implements OnInit, OnDestroy {
       return 'Listening — play a note';
     }
     return latest.status === 'measuring' ? 'Note detected — measuring…' : 'Refining the value…';
+  }
+
+  backgroundLabel(): string {
+    return this.background === 'too-loud'
+      ? 'Some of the sound is not far enough above the background noise to be '
+        + 'detected as notes. A quieter place, or a microphone closer to the '
+        + 'sound, helps.'
+      : '';
   }
 
   recordStatusLabel(record: AttackRecord): string {

@@ -58,6 +58,16 @@
           </p>
           <p class="status-label" *ngIf="!listening">Not listening</p>
 
+          <p
+            class="background-notice"
+            *ngIf="listening && background !== 'normal'"
+            [attr.data-condition]="background"
+            role="status"
+          >
+            <ion-icon name="information-circle-outline" aria-hidden="true"></ion-icon>
+            <span>{{ backgroundLabel() }}</span>
+          </p>
+
           <div class="level" *ngIf="listening">
             <div>
               <span>Input level</span>

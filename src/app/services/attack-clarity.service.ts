@@ -4,12 +4,17 @@
  * Licensed under the GNU Affero General Public License v3.0.
  * See the LICENSE file for more details.
  */
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, isDevMode } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import {
   AttackRecord,
   AttackTracker
 } from '../activities/attack-clarity/attack-tracker';
+import {
+  BackgroundCondition,
+  BackgroundMonitor
+} from '../activities/attack-clarity/background-monitor';
+import { AttackDebug, attackDebugEnabled } from './attack-clarity-debug';
 
 /**
  * Minimal typing of the wasm-bindgen module in assets/attack-clarity, built
@@ -68,8 +73,11 @@ export class AttackClarityService {
   readonly attacks$ = new BehaviorSubject<readonly AttackRecord[]>([]);
   /** Input peak level, 0..1 on a -60..0 dBFS scale. */
   readonly level$ = new BehaviorSubject<number>(0);
+  /** Whether the background lets new notes be detected. */
+  readonly background$ = new BehaviorSubject<BackgroundCondition>('normal');
 
   private readonly tracker = new AttackTracker();
+  private readonly monitor = new BackgroundMonitor();
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
@@ -82,6 +90,7 @@ export class AttackClarityService {
   private levelPeak = 0;
   private levelBlocks = 0;
   private startToken = 0;
+  private debug: AttackDebug | null = null;
 
   constructor(private readonly zone: NgZone) {}
 
@@ -125,6 +134,8 @@ export class AttackClarityService {
       );
       this.blockFill = 0;
       this.blockPeak = 0;
+      this.monitor.reset();
+      this.background$.next('normal');
 
       this.worklet = new AudioWorkletNode(context, 'audio-accumulator', {
         numberOfInputs: 1,
@@ -144,6 +155,10 @@ export class AttackClarityService {
       this.worklet.connect(this.sink);
       this.sink.connect(context.destination);
 
+      if (attackDebugEnabled(isDevMode())) {
+        this.debug = new AttackDebug(() => this.context, () => this.stream, this.monitor);
+        this.debug.start(context.sampleRate);
+      }
       this.state$.next('listening');
     } catch (error) {
       if (token === this.startToken) {
@@ -162,6 +177,8 @@ export class AttackClarityService {
       }
       this.publish(this.analyzer.finish());
     }
+    this.debug?.stop();
+    this.debug = null;
     this.teardown();
     this.state$.next('idle');
   }
@@ -175,6 +192,7 @@ export class AttackClarityService {
     if (!this.analyzer) {
       return;
     }
+    this.debug?.onMessage(samples);
     let offset = 0;
     while (offset < samples.length) {
       const n = Math.min(samples.length - offset, BLOCK_SIZE - this.blockFill);
@@ -199,8 +217,28 @@ export class AttackClarityService {
     if (!this.analyzer) {
       return;
     }
-    const events = this.analyzer.process(samples);
-    this.tracker.addEnvelopes(this.analyzer.take_envelopes());
+    let events: Float64Array;
+    let frames: Float32Array;
+    const t0 = performance.now();
+    try {
+      events = this.analyzer.process(samples);
+      frames = this.analyzer.take_envelopes();
+    } catch (error) {
+      if (this.debug) {
+        this.debug.onError(error);
+      } else {
+        console.error('Attack analyzer failed', error);
+      }
+      return;
+    }
+    this.debug?.onProcessed(performance.now() - t0);
+    this.debug?.onEnvelopes(frames);
+    this.tracker.addEnvelopes(frames);
+    if (this.monitor.addEnvelopes(frames)) {
+      const condition = this.monitor.condition;
+      this.debug?.note(`background ${condition}`);
+      this.zone.run(() => this.background$.next(condition));
+    }
     this.publish(events);
 
     // Level meter refreshed about 12 times per second.
@@ -217,6 +255,9 @@ export class AttackClarityService {
   }
 
   private publish(events: Float64Array): void {
+    if (events.length) {
+      this.debug?.onEvents(events);
+    }
     if (events.length && this.tracker.applyEvents(events)) {
       this.zone.run(() => this.attacks$.next(this.tracker.attacks));
     }
@@ -245,5 +286,6 @@ export class AttackClarityService {
     this.levelPeak = 0;
     this.levelBlocks = 0;
     this.level$.next(0);
+    this.background$.next('normal');
   }
 }
