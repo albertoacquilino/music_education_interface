@@ -14,6 +14,7 @@ import {
   BackgroundCondition,
   BackgroundMonitor
 } from '../activities/attack-clarity/background-monitor';
+import { WaveformTrack } from '../activities/attack-clarity/waveform-track';
 import { AttackDebug, attackDebugEnabled } from './attack-clarity-debug';
 
 /**
@@ -41,7 +42,37 @@ const BLOCK_SIZE = 1024;
 /** Pitch search range, in Hz, covering the instruments of the app. */
 const PITCH_RANGE_HZ: readonly [number, number] = [100, 3000];
 
+/** Seconds of live waveform kept for display. */
+const LIVE_HISTORY_S = 12;
+/** Longest recording, in seconds. */
+export const MAX_RECORDING_S = 30;
+
 export type AttackListenerState = 'idle' | 'starting' | 'listening';
+
+/**
+ * - `empty`: nothing recorded;
+ * - `recording`: the input is being kept;
+ * - `ready`: a recording can be played back;
+ * - `playing`: it is being played back (the analyzer is fed silence).
+ */
+export type RecorderState = 'empty' | 'recording' | 'ready' | 'playing';
+
+/** Up to {@link MAX_RECORDING_S} seconds of input with its waveform and attacks. */
+export interface AttackRecording {
+  /** Stream time of the first sample. */
+  readonly startS: number;
+  /** Stream time just after the last sample. */
+  endS: number;
+  readonly sampleRate: number;
+  readonly samples: Float32Array;
+  length: number;
+  readonly track: WaveformTrack;
+  /** Attacks whose onset falls inside the recording, stream times. */
+  attacks: AttackRecord[];
+  /** Set when listening stops: later events belong to another stream. */
+  frozen: boolean;
+  buffer: AudioBuffer | null;
+}
 
 let modulePromise: Promise<AttackClarityModule> | null = null;
 
@@ -75,6 +106,9 @@ export class AttackClarityService {
   readonly level$ = new BehaviorSubject<number>(0);
   /** Whether the background lets new notes be detected. */
   readonly background$ = new BehaviorSubject<BackgroundCondition>('normal');
+  /** True while the audio context waits for a user gesture (iOS). */
+  readonly suspended$ = new BehaviorSubject<boolean>(false);
+  readonly recorder$ = new BehaviorSubject<RecorderState>('empty');
 
   private readonly tracker = new AttackTracker();
   private readonly monitor = new BackgroundMonitor();
@@ -91,6 +125,11 @@ export class AttackClarityService {
   private levelBlocks = 0;
   private startToken = 0;
   private debug: AttackDebug | null = null;
+  private sampleCount = 0;
+  private silence = new Float32Array(128);
+  private live: WaveformTrack | null = null;
+  private take: AttackRecording | null = null;
+  private playback: { source: AudioBufferSourceNode; startedAt: number; offset: number } | null = null;
 
   constructor(private readonly zone: NgZone) {}
 
@@ -104,6 +143,11 @@ export class AttackClarityService {
       // Created before any await so that it inherits the user gesture (iOS).
       const context = new AudioContext({ latencyHint: 'interactive' });
       this.context = context;
+      context.addEventListener('statechange', () => {
+        if (this.context === context) {
+          this.zone.run(() => this.suspended$.next(context.state === 'suspended'));
+        }
+      });
       // Not awaited: without a user gesture the promise may never settle.
       void context.resume().catch(() => undefined);
       const mod = await loadModule();
@@ -134,6 +178,8 @@ export class AttackClarityService {
       );
       this.blockFill = 0;
       this.blockPeak = 0;
+      this.sampleCount = 0;
+      this.live = new WaveformTrack(context.sampleRate, LIVE_HISTORY_S);
       this.monitor.reset();
       this.background$.next('normal');
 
@@ -159,6 +205,7 @@ export class AttackClarityService {
         this.debug = new AttackDebug(() => this.context, () => this.stream, this.monitor);
         this.debug.start(context.sampleRate);
       }
+      this.suspended$.next(context.state === 'suspended');
       this.state$.next('listening');
     } catch (error) {
       if (token === this.startToken) {
@@ -171,11 +218,20 @@ export class AttackClarityService {
 
   stop(): void {
     this.startToken += 1;
+    this.stopPlaybackSource();
+    if (this.recorder$.value === 'recording') {
+      this.finishRecording();
+    } else if (this.recorder$.value === 'playing') {
+      this.recorder$.next('ready');
+    }
     if (this.analyzer) {
       if (this.blockFill > 0) {
         this.feed(this.block.subarray(0, this.blockFill));
       }
       this.publish(this.analyzer.finish());
+    }
+    if (this.take) {
+      this.take.frozen = true;
     }
     this.debug?.stop();
     this.debug = null;
@@ -188,11 +244,176 @@ export class AttackClarityService {
     this.attacks$.next(this.tracker.attacks);
   }
 
+  /** Resumes an audio context left suspended for lack of a user gesture. */
+  resumeAudio(): void {
+    void this.context?.resume().catch(() => undefined);
+  }
+
+  /** Live waveform, null when not listening. */
+  get liveTrack(): WaveformTrack | null {
+    return this.live;
+  }
+
+  /** Stream time, in seconds, of the latest sample received. */
+  get nowS(): number {
+    return this.context ? this.sampleCount / this.context.sampleRate : 0;
+  }
+
+  get recording(): AttackRecording | null {
+    return this.take;
+  }
+
+  startRecording(): void {
+    const context = this.context;
+    if (!context || this.state$.value !== 'listening' || this.recorder$.value === 'recording') {
+      return;
+    }
+    this.stopPlaybackSource();
+    const sampleRate = context.sampleRate;
+    const startS = this.sampleCount / sampleRate;
+    this.take = {
+      startS,
+      endS: startS,
+      sampleRate,
+      samples: new Float32Array(Math.ceil(MAX_RECORDING_S * sampleRate)),
+      length: 0,
+      track: new WaveformTrack(sampleRate, MAX_RECORDING_S + 0.1, 'linear'),
+      attacks: [],
+      frozen: false,
+      buffer: null
+    };
+    this.recorder$.next('recording');
+  }
+
+  stopRecording(): void {
+    if (this.recorder$.value === 'recording') {
+      this.finishRecording();
+    }
+  }
+
+  discardRecording(): void {
+    this.stopPlaybackSource();
+    this.take = null;
+    this.recorder$.next('empty');
+  }
+
+  /** Plays the recording from `fromS` seconds after its start. */
+  play(fromS = 0): void {
+    const take = this.take;
+    const context = this.context;
+    if (!take || !context || !take.length || this.recorder$.value === 'recording') {
+      return;
+    }
+    this.stopPlaybackSource();
+    if (!take.buffer || take.buffer.sampleRate !== take.sampleRate) {
+      take.buffer = context.createBuffer(1, take.length, take.sampleRate);
+      take.buffer.copyToChannel(take.samples.subarray(0, take.length), 0);
+    }
+    const duration = take.length / take.sampleRate;
+    const offset = Math.max(0, Math.min(fromS, duration - 0.01));
+    const source = context.createBufferSource();
+    source.buffer = take.buffer;
+    source.connect(context.destination);
+    source.onended = () => {
+      if (this.playback?.source === source) {
+        this.zone.run(() => {
+          this.stopPlaybackSource();
+          this.recorder$.next('ready');
+        });
+      }
+    };
+    void context.resume().catch(() => undefined);
+    source.start(0, offset);
+    this.playback = { source, startedAt: context.currentTime, offset };
+    this.recorder$.next('playing');
+  }
+
+  stopPlayback(): void {
+    if (this.recorder$.value === 'playing') {
+      this.stopPlaybackSource();
+      this.recorder$.next('ready');
+    }
+  }
+
+  /** Seconds from the start of the recording to the sound being played. */
+  get playbackPositionS(): number {
+    const take = this.take;
+    if (!this.playback || !this.context || !take) {
+      return 0;
+    }
+    const position = this.playback.offset + this.context.currentTime - this.playback.startedAt;
+    return Math.max(0, Math.min(take.length / take.sampleRate, position));
+  }
+
+  private finishRecording(): void {
+    const take = this.take;
+    if (take) {
+      take.endS = take.startS + take.length / take.sampleRate;
+      take.buffer = null;
+      this.syncRecordingAttacks();
+    }
+    this.recorder$.next(take && take.length ? 'ready' : 'empty');
+    if (take && !take.length) {
+      this.take = null;
+    }
+  }
+
+  private stopPlaybackSource(): void {
+    const playback = this.playback;
+    this.playback = null;
+    if (playback) {
+      playback.source.onended = null;
+      try {
+        playback.source.stop();
+      } catch {
+        // Already stopped.
+      }
+      playback.source.disconnect();
+    }
+  }
+
+  /** Copies into the recording the attacks whose onset falls inside it. */
+  private syncRecordingAttacks(): void {
+    const take = this.take;
+    if (!take || take.frozen) {
+      return;
+    }
+    const endS = this.recorder$.value === 'recording' ? Infinity : take.endS;
+    const all = this.tracker.attacks;
+    for (let i = all.length - 1; i >= 0 && all[i].onsetS >= take.startS - 1e-6; i -= 1) {
+      const record = all[i];
+      if (record.onsetS >= endS) {
+        continue;
+      }
+      const at = take.attacks.findIndex(a => Math.abs(a.onsetS - record.onsetS) < 1e-6);
+      if (at >= 0) {
+        take.attacks[at] = record;
+      } else {
+        take.attacks.push(record);
+      }
+    }
+    take.attacks.sort((a, b) => a.onsetS - b.onsetS);
+  }
+
   private onSamples(samples: Float32Array): void {
     if (!this.analyzer) {
       return;
     }
     this.debug?.onMessage(samples);
+    const first = this.sampleCount;
+    this.sampleCount += samples.length;
+    if (this.playback) {
+      // The speaker plays the recording: keep the clock running on silence
+      // so the analyzer does not measure the playback.
+      if (this.silence.length !== samples.length) {
+        this.silence = new Float32Array(samples.length);
+      }
+      samples = this.silence;
+    }
+    this.live?.addSamples(samples, first);
+    if (this.recorder$.value === 'recording') {
+      this.record(samples, first);
+    }
     let offset = 0;
     while (offset < samples.length) {
       const n = Math.min(samples.length - offset, BLOCK_SIZE - this.blockFill);
@@ -210,6 +431,21 @@ export class AttackClarityService {
         this.feed(this.block);
         this.blockFill = 0;
       }
+    }
+  }
+
+  private record(samples: Float32Array, first: number): void {
+    const take = this.take;
+    if (!take) {
+      return;
+    }
+    const room = take.samples.length - take.length;
+    const n = Math.min(room, samples.length);
+    take.samples.set(n === samples.length ? samples : samples.subarray(0, n), take.length);
+    take.length += n;
+    take.track.addSamples(samples.subarray(0, n), first);
+    if (n < samples.length || take.length >= take.samples.length) {
+      this.zone.run(() => this.finishRecording());
     }
   }
 
@@ -234,6 +470,10 @@ export class AttackClarityService {
     this.debug?.onProcessed(performance.now() - t0);
     this.debug?.onEnvelopes(frames);
     this.tracker.addEnvelopes(frames);
+    this.live?.addEnvelopes(frames);
+    if (this.take && !this.take.frozen) {
+      this.take.track.addEnvelopes(frames);
+    }
     if (this.monitor.addEnvelopes(frames)) {
       const condition = this.monitor.condition;
       this.debug?.note(`background ${condition}`);
@@ -259,6 +499,7 @@ export class AttackClarityService {
       this.debug?.onEvents(events);
     }
     if (events.length && this.tracker.applyEvents(events)) {
+      this.syncRecordingAttacks();
       this.zone.run(() => this.attacks$.next(this.tracker.attacks));
     }
   }
@@ -281,11 +522,13 @@ export class AttackClarityService {
     this.stream = null;
     this.context = null;
     this.analyzer = null;
+    this.live = null;
     this.blockFill = 0;
     this.blockPeak = 0;
     this.levelPeak = 0;
     this.levelBlocks = 0;
     this.level$.next(0);
     this.background$.next('normal');
+    this.suspended$.next(false);
   }
 }

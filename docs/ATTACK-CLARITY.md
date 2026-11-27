@@ -34,7 +34,8 @@ pitch jump for slurs) and costs about 1% of real time.
 | `src/assets/attack-clarity/attack_clarity_wasm.js`, `attack_clarity_wasm_bg.wasm` | wasm-bindgen package (`--target web`), copied from attack-clarity-rs |
 | `src/app/services/attack-clarity.service.ts` | `AttackClarityService`: microphone, AudioWorklet, wasm analyzer, observables |
 | `src/app/activities/attack-clarity/attack-tracker.ts` | `AttackTracker`: turns analyzer events into a list of attacks (pure, unit tested) |
-| `src/app/pages/attack/` | `AttackPage`: the tab UI |
+| `src/app/activities/attack-clarity/waveform-track.ts` | `WaveformTrack`: down-sampled input for the scrolling views |
+| `src/app/pages/attack/` | `AttackPage`: the tab UI; `stage/` holds the canvas and its four renderers |
 | `src/app/pages/tabs/tabs.page.*`, `src/app/app.routes.ts` | new mode `attack`, route `/home/attack`, entries in the desktop nav, mobile tab bar and Options › Mode |
 
 ## Audio path
@@ -122,17 +123,41 @@ in English or Italian names according to the Note Names setting.
 
 ## UI
 
-The layout follows Target Intonation: a header with the instrument, a start
-panel explaining what is measured, then two panels and a controls bar.
+The tab favours pictures over text. Listening starts by itself when the tab
+is entered (`ionViewDidEnter`) and stops when it is left or the app goes to
+the background. If iOS keeps the audio context suspended for lack of a user
+gesture, a "Tap to listen" overlay resumes it.
 
-- **Last attack**: the last available value in large type, with note and
-  time, the listening status, the input level and a strip of the last 16
-  attacks (scale rounded up to 50 ms, at least 100 ms).
-- **Recorded attacks**: newest first, with number, note, time, a
-  proportional bar and the value.
-- **Controls**: Stop, Clear list, Start listening. The list survives Stop;
-  Options is disabled while listening. Leaving the tab stops listening and
-  releases the microphone.
+- **Stage**: a canvas (`pages/attack/stage/`) redrawn on every animation
+  frame outside the Angular zone, showing the input scrolling right to left
+  with the attacks drawn where they happen. A selector at the top switches
+  between four views (kept in `localStorage.attackVariant`):
+  - *Wave*: the waveform, blue where the harmonic part dominates and grey
+    where the noise does, with a lens over each attack that magnifies the
+    first ~150 ms (noise and harmonic envelopes, attack shaded) and its value;
+  - *Fog*: a closer view (2–4 s) of the harmonic envelope rising through the
+    noise envelope, with an arrow from the onset to where the tone clears it;
+  - *Pitch*: a pitch ribbon (height = written note, thickness = level), each
+    note starting with a bubble whose size follows the attack time;
+  - *Spotlight*: the last value in large type over the history of the last
+    N attacks at a fixed spacing (a pause does not empty it), each bar with
+    its value on top and the written note underneath. N fits the width with
+    slots of at least 40 px, between 6 and 24 (about 9 on a phone).
+- **Record** (up to 30 s, `MAX_RECORDING_S`) and **play back**: while
+  playing, the stage shows the recording with a centred playhead, the values
+  appearing as the playhead reaches them, and an overview strip that can be
+  tapped to seek. During playback the analyzer is fed silence, so the sound
+  coming out of the speaker is not measured again. Options are disabled only
+  while recording or playing.
+
+The waveform data comes from `WaveformTrack`
+(`activities/attack-clarity/waveform-track.ts`, unit tested): 5 ms columns
+with the peak of the raw samples and, from the envelope frames, the largest
+harmonic and noise levels and the pitch. The service keeps a 12 s ring for
+the live view and a linear track for the recording.
+
+Not yet tried on a device: playback while the microphone is open may be
+routed to the iPhone earpiece rather than the speaker.
 
 ## Loud backgrounds
 
