@@ -1,0 +1,106 @@
+<div class="ion-page" id="attack-content">
+  <ion-content [fullscreen]="true" [scrollY]="false">
+    <main class="attack-page">
+      <header class="top-bar">
+        <span class="instrument-chip">{{ selectedInstrumentName }}</span>
+      </header>
+
+      <section
+        class="stage surface-panel"
+        [class.is-recording]="recorder === 'recording'"
+        [class.is-playing]="recorder === 'playing'"
+      >
+        <app-attack-stage
+          [source]="stageSource"
+          (seek)="seek($event)"
+        ></app-attack-stage>
+
+        <div class="stage-chip" *ngIf="listening && background !== 'normal' && recorder !== 'playing'" role="status">
+          <ion-icon name="volume-high-outline" aria-hidden="true"></ion-icon>
+          <span>Too noisy here</span>
+        </div>
+
+        <div class="stage-overlay" *ngIf="state === 'starting'">
+          <ion-spinner name="crescent"></ion-spinner>
+        </div>
+
+        <button
+          type="button"
+          class="stage-overlay tap-to-listen"
+          *ngIf="listening && suspended"
+          (click)="resume()"
+        >
+          <span class="mic-bubble"><ion-icon name="mic-outline" aria-hidden="true"></ion-icon></span>
+          <span>Tap to listen</span>
+        </button>
+
+        <div class="stage-overlay" *ngIf="state === 'idle' && errorMessage">
+          <span class="mic-bubble muted"><ion-icon name="mic-outline" aria-hidden="true"></ion-icon></span>
+          <span>{{ errorMessage }}</span>
+          <ion-button fill="outline" size="small" (click)="start()">
+            <ion-icon slot="start" name="refresh" aria-hidden="true"></ion-icon>
+            Retry
+          </ion-button>
+        </div>
+      </section>
+
+      <footer class="transport">
+        <button
+          type="button"
+          class="round-button record-button"
+          [class.active]="recorder === 'recording'"
+          [disabled]="!listening || recorder === 'playing'"
+          (click)="toggleRecord()"
+          [attr.aria-label]="recorder === 'recording' ? 'Stop recording' : 'Record up to ' + maxRecordingS + ' seconds'"
+        >
+          <svg viewBox="0 0 68 68" aria-hidden="true">
+            <circle class="ring-track" cx="34" cy="34" r="30"></circle>
+            <circle
+              class="ring-progress"
+              cx="34" cy="34" r="30"
+              [attr.stroke-dasharray]="ring"
+              [attr.stroke-dashoffset]="recorder === 'recording' ? ringOffset : ring"
+            ></circle>
+          </svg>
+          <span class="record-glyph"></span>
+        </button>
+
+        <span class="clock" *ngIf="recorder === 'recording'">
+          {{ formatClock(clockS) }}<small> / {{ formatClock(maxRecordingS) }}</small>
+        </span>
+
+        <ng-container *ngIf="hasRecording">
+          <button
+            type="button"
+            class="round-button play-button"
+            [class.active]="recorder === 'playing'"
+            (click)="togglePlay()"
+            [attr.aria-label]="recorder === 'playing' ? 'Stop playback' : 'Play the recording'"
+          >
+            <svg viewBox="0 0 68 68" aria-hidden="true">
+              <circle class="ring-track" cx="34" cy="34" r="30"></circle>
+              <circle
+                class="ring-progress"
+                cx="34" cy="34" r="30"
+                [attr.stroke-dasharray]="ring"
+                [attr.stroke-dashoffset]="recorder === 'playing' ? ringOffset : ring"
+              ></circle>
+            </svg>
+            <ion-icon [name]="recorder === 'playing' ? 'pause' : 'play'" aria-hidden="true"></ion-icon>
+          </button>
+          <span class="clock">
+            {{ formatClock(recorder === 'playing' ? clockS : recordingDurationS) }}
+          </span>
+          <button
+            type="button"
+            class="round-button small-button"
+            (click)="discard()"
+            aria-label="Discard the recording"
+          >
+            <ion-icon name="close" aria-hidden="true"></ion-icon>
+          </button>
+        </ng-container>
+      </footer>
+    </main>
+  </ion-content>
+</div>

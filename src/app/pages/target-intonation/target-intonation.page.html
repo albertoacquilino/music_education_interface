@@ -22,11 +22,9 @@
           </p>
         </div>
         <ion-item lines="none">
-          <ion-label>Play reference tone</ion-label>
-          <ion-toggle
-            [(ngModel)]="playReferenceTone"
-            aria-label="Play reference tone"
-          ></ion-toggle>
+          <ion-toggle [(ngModel)]="playReferenceTone" justify="space-between">
+            Play reference tone
+          </ion-toggle>
         </ion-item>
         <p class="terminal-message" *ngIf="terminalMessage">{{ terminalMessage }}</p>
         <ion-button expand="block" size="large" (click)="start()">

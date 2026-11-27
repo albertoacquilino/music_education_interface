@@ -23,12 +23,18 @@ import {
 import { RefFreqService } from 'src/app/services/ref-freq.service';
 import { SoundsService } from 'src/app/services/sounds.service';
 import { addIcons } from 'ionicons';
-import { close, musicalNote, musicalNotes, optionsOutline, pulseOutline, settingsOutline, textOutline, volumeHighOutline, moonOutline, eyeOutline, languageOutline } from 'ionicons/icons';
+import { close, musicalNote, musicalNotes, optionsOutline, pulseOutline, settingsOutline, textOutline, volumeHighOutline, moonOutline, eyeOutline, languageOutline, timerOutline } from 'ionicons/icons';
 import {
   ActivitySessionService
 } from 'src/app/core/activity/activity-session.service';
+import { initialDarkMode } from '../../services/dark-mode-preference';
 
-type ExerciseMode = 'instrument' | 'tuner';
+type ExerciseMode = 'instrument' | 'tuner' | 'attack';
+const MODE_ROUTES: Record<ExerciseMode, string> = {
+  instrument: 'exercise',
+  tuner: 'intonation',
+  attack: 'attack',
+};
 const INSTRUMENT_OPTIONS = ['trumpet', 'clarinet', 'oboe', 'flute'] as const;
 
 @Component({
@@ -68,7 +74,7 @@ export class TabsComponent implements OnInit, OnDestroy {
   @ViewChild('tabs', { static: false }) tabs: IonTabs | undefined;
 
   ngOnInit(): void {
-    addIcons({ close, musicalNote, musicalNotes, optionsOutline, pulseOutline, settingsOutline, textOutline, volumeHighOutline, moonOutline, eyeOutline, languageOutline });
+    addIcons({ close, musicalNote, musicalNotes, optionsOutline, pulseOutline, settingsOutline, textOutline, volumeHighOutline, moonOutline, eyeOutline, languageOutline, timerOutline });
     this.refFrequencyService.getRefFrequency().subscribe(value => {
       this.refFrequencyValue$ = value;
     });
@@ -84,27 +90,27 @@ export class TabsComponent implements OnInit, OnDestroy {
   }
 
   private ensureActivityRoute(): void {
-    if (this.router.url.includes('/home/intonation')) {
-      this.exerciseMode = 'tuner';
-    } else if (this.router.url.includes('/home/exercise')) {
-      this.exerciseMode = 'instrument';
+    const current = this.modeFromUrl();
+    if (current) {
+      this.exerciseMode = current;
     } else {
-      const route = this.exerciseMode === 'tuner' ? 'intonation' : 'exercise';
-      void this.router.navigate(['/home', route], { replaceUrl: true });
+      void this.router.navigate(['/home', MODE_ROUTES[this.exerciseMode]], { replaceUrl: true });
     }
     void this.syncIonTabsSelection();
   }
 
   private async syncIonTabsSelection(): Promise<void> {
     try {
-      await this.tabs?.select(
-        this.router.url.includes('/home/intonation')
-          ? 'intonation'
-          : 'exercise'
-      );
+      await this.tabs?.select(MODE_ROUTES[this.modeFromUrl() ?? 'instrument']);
     } catch {
       // Tab may already be selected or tabs not ready yet.
     }
+  }
+
+  private modeFromUrl(): ExerciseMode | null {
+    const mode = (Object.keys(MODE_ROUTES) as ExerciseMode[])
+      .find(m => this.router.url.includes(`/home/${MODE_ROUTES[m]}`));
+    return mode ?? null;
   }
 
   isDisabled(): boolean {
@@ -121,6 +127,8 @@ export class TabsComponent implements OnInit, OnDestroy {
       this.exerciseMode = 'instrument';
     } else if (tabId === 'intonation') {
       this.exerciseMode = 'tuner';
+    } else if (tabId === 'attack') {
+      this.exerciseMode = 'attack';
     }
   }
 
@@ -135,7 +143,7 @@ export class TabsComponent implements OnInit, OnDestroy {
     this.applyExerciseModeToSounds();
     this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage('useFlatsAndSharps', false);
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
-    this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
+    this.isDarkMode = initialDarkMode();
     this.language = localStorage.getItem('language') ?? 'en';
     this.applyDarkMode(this.isDarkMode);
   }
@@ -151,8 +159,8 @@ export class TabsComponent implements OnInit, OnDestroy {
       instrument = savedInstrument;
     }
 
-    if (savedMode === 'tuner') {
-      mode = 'tuner';
+    if (savedMode === 'tuner' || savedMode === 'attack') {
+      mode = savedMode;
     } else if (savedMode === 'instrument') {
       mode = 'instrument';
     } else if (savedInstrument === 'tuner') {
@@ -179,7 +187,6 @@ export class TabsComponent implements OnInit, OnDestroy {
     localStorage.setItem('selectedInstrument', this.selectedInstrument);
     localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
-    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
     localStorage.setItem('language', this.language);
   }
 
@@ -197,14 +204,14 @@ export class TabsComponent implements OnInit, OnDestroy {
 
   async switchMode(event: CustomEvent) {
     const mode = event.detail.value as ExerciseMode;
-    if (mode !== 'instrument' && mode !== 'tuner') {
+    if (!(mode in MODE_ROUTES)) {
       return;
     }
 
     this.exerciseMode = mode;
     this.applyExerciseModeToSounds();
 
-    if (mode === 'tuner') {
+    if (mode === 'tuner' || mode === 'attack') {
       await this.prepareTunerMedia();
     } else {
       await this.prepareExerciseMedia();
@@ -214,7 +221,7 @@ export class TabsComponent implements OnInit, OnDestroy {
   }
 
   async openActivity(mode: ExerciseMode): Promise<void> {
-    const route = mode === 'tuner' ? 'intonation' : 'exercise';
+    const route = MODE_ROUTES[mode];
     if (this.router.url.includes(`/home/${route}`)) {
       return;
     }
@@ -259,6 +266,8 @@ export class TabsComponent implements OnInit, OnDestroy {
   switchDarkMode(event: CustomEvent) {
     this.isDarkMode = event.detail.checked;
     this.applyDarkMode(this.isDarkMode);
+    // Saved only here: until the user chooses, the app follows the system.
+    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
     this.saveStateToLocalStorage();
     this.emitSettingsUpdated();
   }

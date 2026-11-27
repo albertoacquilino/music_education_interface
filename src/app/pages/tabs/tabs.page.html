@@ -53,6 +53,9 @@
                 <ion-segment-button value="tuner">
                   <ion-label>Target Intonation</ion-label>
                 </ion-segment-button>
+                <ion-segment-button value="attack">
+                  <ion-label>Attack</ion-label>
+                </ion-segment-button>
               </ion-segment>
             </ion-item>
           </ion-list>
@@ -200,6 +203,16 @@
           <ion-icon name="pulse-outline" aria-hidden="true"></ion-icon>
           <span>Target Intonation</span>
         </button>
+        <button
+          class="app-nav-tab"
+          [class.active]="exerciseMode === 'attack'"
+          type="button"
+          [attr.aria-current]="exerciseMode === 'attack' ? 'page' : null"
+          (click)="openActivity('attack')"
+        >
+          <ion-icon name="timer-outline" aria-hidden="true"></ion-icon>
+          <span>Attack</span>
+        </button>
       </nav>
 
       <button
@@ -258,6 +271,14 @@
       >
         <ion-icon name="pulse-outline"></ion-icon>
         <ion-label>Intonation</ion-label>
+      </ion-tab-button>
+      <ion-tab-button
+        tab="attack"
+        [selected]="exerciseMode === 'attack'"
+        (click)="openActivity('attack')"
+      >
+        <ion-icon name="timer-outline"></ion-icon>
+        <ion-label>Attack</ion-label>
       </ion-tab-button>
     </ion-tab-bar>
   </ion-tabs>
