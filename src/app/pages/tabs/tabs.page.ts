@@ -27,6 +27,7 @@ import { close, musicalNote, musicalNotes, optionsOutline, pulseOutline, setting
 import {
   ActivitySessionService
 } from 'src/app/core/activity/activity-session.service';
+import { initialDarkMode } from '../../services/dark-mode-preference';
 
 type ExerciseMode = 'instrument' | 'tuner' | 'attack';
 const MODE_ROUTES: Record<ExerciseMode, string> = {
@@ -142,7 +143,7 @@ export class TabsComponent implements OnInit, OnDestroy {
     this.applyExerciseModeToSounds();
     this.useFlatsAndSharps = this.retrieveAndParseFromLocalStorage('useFlatsAndSharps', false);
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
-    this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
+    this.isDarkMode = initialDarkMode();
     this.language = localStorage.getItem('language') ?? 'en';
     this.applyDarkMode(this.isDarkMode);
   }
@@ -186,7 +187,6 @@ export class TabsComponent implements OnInit, OnDestroy {
     localStorage.setItem('selectedInstrument', this.selectedInstrument);
     localStorage.setItem('useFlatsAndSharps', JSON.stringify(this.useFlatsAndSharps));
     localStorage.setItem('useDynamics', JSON.stringify(this.useDynamics));
-    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
     localStorage.setItem('language', this.language);
   }
 
@@ -266,6 +266,8 @@ export class TabsComponent implements OnInit, OnDestroy {
   switchDarkMode(event: CustomEvent) {
     this.isDarkMode = event.detail.checked;
     this.applyDarkMode(this.isDarkMode);
+    // Saved only here: until the user chooses, the app follows the system.
+    localStorage.setItem('isDarkMode', JSON.stringify(this.isDarkMode));
     this.saveStateToLocalStorage();
     this.emitSettingsUpdated();
   }

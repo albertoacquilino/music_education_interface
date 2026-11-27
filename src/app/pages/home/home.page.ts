@@ -69,6 +69,7 @@ import {
 import { scoreFromNote } from '../../utils/score.utils';
 import { noteAssetName } from '../../instruments/note-asset-name';
 import { FluteFingeringComponent } from '../../components/flute-fingering/flute-fingering.component';
+import { initialDarkMode } from '../../services/dark-mode-preference';
 
 @Component({
   selector: 'app-home',
@@ -395,7 +396,7 @@ export class HomePage implements OnInit, AfterViewInit, OnDestroy {
     );
     this.useDynamics = this.retrieveAndParseFromLocalStorage('useDynamics', false);
     this.language = localStorage.getItem('language') ?? 'en';
-    this.isDarkMode = this.retrieveAndParseFromLocalStorage('isDarkMode', false);
+    this.isDarkMode = initialDarkMode();
     this.applyDarkMode(this.isDarkMode);
   }
 

@@ -29,6 +29,16 @@
 </head>
 
 <body>
+  <script>
+    // Dark Mode before Angular starts (same rule as initialDarkMode): the
+    // saved setting, otherwise the OS colour scheme.
+    try {
+      var saved = localStorage.getItem('isDarkMode');
+      if (saved !== null ? JSON.parse(saved) === true : matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark-theme');
+      }
+    } catch (e) {}
+  </script>
   <app-root></app-root>
   <script src="https://accounts.google.com/gsi/client" async defer ></script>
 </body>
