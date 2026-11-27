@@ -874,6 +874,14 @@ body.dark-theme {
     color: #ffffff !important;
   }
 
+  // Same for the activity tabs outside #main-content: without this their
+  // ion-content keeps the light background when the OS is in light mode.
+  app-target-intonation ion-content,
+  app-attack ion-content {
+    --background: transparent;
+    background: transparent;
+  }
+
   app-pitchlite .tuner-card.surface-panel {
     background: var(--app-surface, #111111) !important;
     border-color: var(--app-border, #2a2a2a);
